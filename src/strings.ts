@@ -34,6 +34,7 @@ const en = {
     commandNote: 'Export the current note',
     about: 'Exports are built by the export engine of PureWrite, a focused Markdown writer for Mac, iPhone and iPad. A folder exported here and in PureWrite is the same document, and the two share its settings (.purewrite-book.json in the folder).',
     aboutLink: 'About PureWrite',
+    credit: 'Made with the export engine of {app}',
 };
 
 const he: typeof en = {
@@ -64,6 +65,7 @@ const he: typeof en = {
     commandNote: 'ייצוא הפתק הנוכחי',
     about: 'הייצוא נבנה במנוע הייצוא של PureWrite, עורך Markdown ממוקד ל־Mac, ל־iPhone ול־iPad. תיקייה שמיוצאת כאן וב־PureWrite היא אותו מסמך, ושניהם חולקים את ההגדרות שלה (‎.purewrite-book.json בתיקייה).',
     aboutLink: 'על PureWrite',
+    credit: 'נוצר במנוע הייצוא של {app}',
 };
 
 export type StringKey = keyof typeof en;

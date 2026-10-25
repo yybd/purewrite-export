@@ -316,6 +316,16 @@ class ExportModal extends Modal {
         const status = footer.createDiv({ cls: 'pwx-status' });
         const save = footer.createEl('button', { cls: 'pwx-primary', text: t('save', { format: FORMAT_LABELS[this.format] }) });
         save.addEventListener('click', () => void this.start(save, status));
+        this.credit(footer);
+    }
+
+    /** One quiet line under the button: whose engine made the file, and a way to the app. */
+    private credit(parent: HTMLElement) {
+        const line = parent.createEl('p', { cls: 'pwx-credit' });
+        const [before, after = ''] = t('credit').split('{app}');
+        line.appendText(before);
+        line.createEl('a', { text: 'PureWrite', href: PUREWRITE_URL });
+        line.appendText(after);
     }
 
     private checkbox(parent: HTMLElement, text: string, checked: boolean, onChange: (v: boolean) => void): HTMLElement {
@@ -386,6 +396,7 @@ class ExportModal extends Modal {
             });
         }
         footer.createEl('button', { cls: canOpen ? 'pwx-secondary' : 'pwx-primary', text: t('done') }).addEventListener('click', () => this.close());
+        this.credit(footer);
     }
 
     onClose() {
