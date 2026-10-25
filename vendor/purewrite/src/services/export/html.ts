@@ -45,7 +45,7 @@ export function firstLineIndentCss(indent: string, gap: string): string {
 
 // Characters XML forbids (control characters other than tab and newlines):
 // one of them makes an EPUB chapter unreadable.
-// eslint-disable-next-line no-control-regex
+// eslint-disable-next-line no-control-regex -- control characters are what this pattern removes
 const INVALID_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
 
 export function escapeHtml(s: string): string {

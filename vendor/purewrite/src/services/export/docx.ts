@@ -60,7 +60,7 @@ export interface DocxInput {
 // Characters XML 1.0 does not allow at all (control characters other than
 // tab, newline and return). One stray \u000B from a paste would make Word
 // refuse the whole file.
-// eslint-disable-next-line no-control-regex
+// eslint-disable-next-line no-control-regex -- control characters are what this pattern removes
 const INVALID_XML = /[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
 
 export function xmlEscape(s: string): string {

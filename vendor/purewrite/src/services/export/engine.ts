@@ -90,7 +90,7 @@ export async function imageFromBytes(bytes: Uint8Array): Promise<ExportImage | n
 
 /** The file name for an export: the title, made safe. */
 export function exportFileName(title: string, format: string): string {
-    // eslint-disable-next-line no-control-regex
+    // eslint-disable-next-line no-control-regex -- control characters are not allowed in a file name
     const base = title.replace(/[/\\:*?"<>|\u0000-\u001F]/g, '-').trim().replace(/^\.+/, '') || 'PureWrite';
     return `${base}.${format}`;
 }
