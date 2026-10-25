@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder, normalizePath, type TAbstractFile } from 'obsidian';
+import { App, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, TFolder, normalizePath, type TAbstractFile } from 'obsidian';
 import {
     buildBook,
     exportFileName,
@@ -41,6 +41,19 @@ interface Job {
     book: BookSettings;
     /** Where the export is written. */
     outDir: string;
+}
+
+/**
+ * What the desktop app can do with a file it doesn't open itself. Not in the
+ * public API, so each is looked up before it is offered; on a phone neither
+ * exists and the dialog says where the file is.
+ */
+interface DesktopApp {
+    openWithDefaultApp?(path: string): void;
+    showInFolder?(path: string): void;
+}
+interface VaultConfig {
+    getConfig?(key: string): unknown;
 }
 
 const folderPath = (folder: TFolder) => (folder.isRoot() ? '' : folder.path);
@@ -284,8 +297,7 @@ class ExportModal extends Modal {
                             { title, chapterPageBreak: this.chapterPageBreak, firstLineIndent: this.firstLineIndent },
                             (text) => status.setText(text),
                         );
-                        this.close();
-                        new Notice(`Saved ${path}`);
+                        this.showDone(path);
                     } catch (e) {
                         console.error('PureWrite Export failed', e);
                         status.setText(`Export failed: ${(e as Error)?.message ?? e}`);
@@ -294,6 +306,47 @@ class ExportModal extends Modal {
                     }
                 }),
         );
+    }
+
+    /**
+     * The export's result, in the dialog. Closing it with a Notice was too
+     * quiet: Obsidian's file list hides .docx and .epub unless "Detect all
+     * file extensions" is on, so the file appeared nowhere and the export
+     * looked as if it had done nothing.
+     */
+    private showDone(path: string) {
+        const { contentEl } = this;
+        contentEl.empty();
+        this.setTitle('Exported');
+        contentEl.createDiv({ cls: 'setting-item-description', text: 'Saved to' });
+        const where = contentEl.createDiv({ cls: 'purewrite-export-path', text: path });
+        where.dir = 'auto';
+
+        const desktop = this.app as unknown as DesktopApp;
+        const shown = (this.app.vault as unknown as VaultConfig).getConfig?.('showUnsupportedFiles');
+        if (shown === false) {
+            contentEl.createDiv({
+                cls: 'setting-item-description',
+                text: 'Obsidian’s file list shows Word and EPUB files only with Settings → Files and links → Detect all file extensions.',
+            });
+        }
+
+        const buttons = new Setting(contentEl);
+        if (Platform.isDesktopApp && desktop.showInFolder) {
+            buttons.addButton((b) => b.setButtonText('Show in folder').onClick(() => desktop.showInFolder!(path)));
+        }
+        if (Platform.isDesktopApp && desktop.openWithDefaultApp) {
+            buttons.addButton((b) =>
+                b
+                    .setButtonText('Open')
+                    .setCta()
+                    .onClick(() => {
+                        desktop.openWithDefaultApp!(path);
+                        this.close();
+                    }),
+            );
+        }
+        buttons.addButton((b) => b.setButtonText('Done').onClick(() => this.close()));
     }
 
     onClose() {

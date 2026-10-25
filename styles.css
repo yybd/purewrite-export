@@ -12,3 +12,9 @@
 .purewrite-export-status {
     min-height: 1.4em;
 }
+.purewrite-export-path {
+    margin: 0.3em 0 0.8em;
+    font-family: var(--font-monospace);
+    font-size: var(--font-ui-small);
+    word-break: break-all;
+}
