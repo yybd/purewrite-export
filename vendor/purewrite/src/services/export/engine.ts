@@ -1,5 +1,6 @@
 import { Editor, type JSONContent } from '@tiptap/core';
 import { editorExtensions } from '../../extensions/editorExtensions';
+import { splitFrontMatter } from '../../extensions/frontMatter';
 import { buildDocx, type ExportChapter, type ExportImage } from './docx';
 import { buildEpub } from './epub';
 import { buildPrintDocument, printPage } from './html';
@@ -31,7 +32,8 @@ export interface EngineInput {
 export function parseMarkdown(markdown: string): JSONContent {
     const editor = new Editor({
         extensions: editorExtensions({ loadImage: async () => null, saveImage: async () => null, onSaveError: () => {} }),
-        content: markdown,
+        // A note's front matter is its properties, not text of the chapter.
+        content: splitFrontMatter(markdown).body,
     });
     const doc = editor.getJSON();
     editor.destroy();

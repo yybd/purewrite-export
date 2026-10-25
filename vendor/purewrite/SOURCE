@@ -1,4 +1,4 @@
-PureWrite 8cf11a1
+PureWrite ed7209d
 src/services/export/engine.ts
 src/services/export/book.ts
 src/services/export/docx.ts
@@ -15,4 +15,6 @@ src/extensions/ParagraphDirection.ts
 src/extensions/SearchHighlight.ts
 src/extensions/TableMarkdown.ts
 src/extensions/TaskListMarkdown.ts
+src/extensions/TextWithCitations.ts
 src/extensions/editorExtensions.ts
+src/extensions/frontMatter.ts

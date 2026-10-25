@@ -15,6 +15,7 @@ import { FootnoteReference, FootnoteDefinition } from './Footnotes';
 import { ImageInFolder, ImageLoader, ImageSaver } from './ImageInFolder';
 import { SearchHighlight } from './SearchHighlight';
 import { FocusMode } from './FocusMode';
+import { TextWithCitations } from './TextWithCitations';
 
 export interface ImageIO {
     loadImage: ImageLoader;
@@ -36,7 +37,10 @@ export function editorExtensions(images: ImageIO): AnyExtension[] {
     // would add an empty paragraph after a closing table or list, and
     // ListKeymap changes what Backspace and Delete do at a list's edge —
     // both new behaviour nobody asked for, so they stay off.
-    StarterKit.configure({ link: false, underline: false, trailingNode: false, listKeymap: false }),
+    StarterKit.configure({ link: false, underline: false, trailingNode: false, listKeymap: false, text: false }),
+    // The kit's text node, saved without escaping a Pandoc citation
+    // (`[@key]` came back as `\[@key\]`; see TextWithCitations.ts).
+    TextWithCitations,
     // html:false — don't parse raw HTML embedded in markdown files
     // (keeps saved markdown clean, and defense-in-depth for a webview
     // whose IPC can touch the filesystem).
