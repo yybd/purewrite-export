@@ -1,0 +1,14 @@
+.purewrite-export-chapters {
+    max-height: 12em;
+    overflow-y: auto;
+    margin: 0.4em 0;
+    padding-inline-start: 2em;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+}
+.purewrite-export-chapters li {
+    padding: 0.15em 0;
+}
+.purewrite-export-status {
+    min-height: 1.4em;
+}

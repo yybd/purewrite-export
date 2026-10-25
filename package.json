@@ -1,0 +1,41 @@
+{
+  "name": "purewrite-export",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Book-ready Word and EPUB from a note or a folder, Hebrew and English alike — PureWrite's export engine in Obsidian.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/sync-engine.mjs --check && tsc --noEmit && node esbuild.config.mjs production",
+    "dev": "node esbuild.config.mjs",
+    "sync-engine": "node scripts/sync-engine.mjs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "14.1.2",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "happy-dom": "21.0.4",
+    "obsidian": "^1.8.7",
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.7"
+  },
+  "dependencies": {
+    "@tiptap/core": "2.27.2",
+    "@tiptap/extension-image": "2.27.3",
+    "@tiptap/extension-link": "2.27.2",
+    "@tiptap/extension-subscript": "2.27.2",
+    "@tiptap/extension-superscript": "2.27.2",
+    "@tiptap/extension-table": "2.27.2",
+    "@tiptap/extension-table-cell": "2.27.2",
+    "@tiptap/extension-table-header": "2.27.2",
+    "@tiptap/extension-table-row": "2.27.2",
+    "@tiptap/extension-task-item": "2.27.2",
+    "@tiptap/extension-task-list": "2.27.2",
+    "@tiptap/extension-text-align": "2.27.2",
+    "@tiptap/extension-underline": "2.27.2",
+    "@tiptap/pm": "2.27.2",
+    "@tiptap/starter-kit": "2.27.2",
+    "markdown-it": "14.1.1",
+    "tiptap-markdown": "0.8.10"
+  }
+}

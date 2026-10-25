@@ -1,0 +1,18 @@
+PureWrite 4bc1a23
+src/services/export/engine.ts
+src/services/export/book.ts
+src/services/export/docx.ts
+src/services/export/epub.ts
+src/services/export/html.ts
+src/services/export/direction.ts
+src/services/export/templates.ts
+src/services/export/zip.ts
+src/extensions/FocusMode.ts
+src/extensions/Footnotes.ts
+src/extensions/ImageInFolder.ts
+src/extensions/LinkWithTitle.ts
+src/extensions/ParagraphDirection.ts
+src/extensions/SearchHighlight.ts
+src/extensions/TableMarkdown.ts
+src/extensions/TaskListMarkdown.ts
+src/extensions/editorExtensions.ts

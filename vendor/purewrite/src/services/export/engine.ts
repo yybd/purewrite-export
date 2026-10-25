@@ -1,0 +1,98 @@
+import { Editor, type JSONContent } from '@tiptap/core';
+import { editorExtensions } from '../../extensions/editorExtensions';
+import { buildDocx, type ExportChapter, type ExportImage } from './docx';
+import { buildEpub } from './epub';
+
+/**
+ * The export engine with nothing of the app in it: Markdown in, the bytes of
+ * a Word or EPUB file out. It needs a DOM (the editor parses through one, and
+ * images are decoded by the browser) and nothing else — no Tauri, no file
+ * system. Reading the files is the caller's: exportFolder.ts reads them
+ * through the app, the Obsidian plugin through the vault, and both hand the
+ * same text to the same parser, so a book exported from either is the same
+ * document. PDF is not here: it is laid out by the app's own WebKit (pdf.ts).
+ */
+
+export type EngineFormat = 'docx' | 'epub';
+
+export interface EngineInput {
+    title: string;
+    chapters: ExportChapter[];
+    defaultDirection: 'rtl' | 'ltr';
+    chapterPageBreak?: boolean;
+    firstLineIndent?: boolean;
+}
+
+/** Markdown through the editor's whole schema — what the editor would show. */
+export function parseMarkdown(markdown: string): JSONContent {
+    const editor = new Editor({
+        extensions: editorExtensions({ loadImage: async () => null, saveImage: async () => null, onSaveError: () => {} }),
+        content: markdown,
+    });
+    const doc = editor.getJSON();
+    editor.destroy();
+    return doc;
+}
+
+/** Every image `src` in a parsed chapter, as written. */
+export function imageSources(node: JSONContent, out: Set<string> = new Set()): Set<string> {
+    if (node.type === 'image' && node.attrs?.src) out.add(String(node.attrs.src));
+    for (const child of node.content ?? []) imageSources(child, out);
+    return out;
+}
+
+/** A remote or inline image, which the export never fetches. */
+export const isRemoteImage = (src: string) => /^(https?:|data:|blob:)/i.test(src);
+
+function sniff(bytes: Uint8Array): ExportImage['type'] | null {
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'png';
+    if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'jpeg';
+    if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'gif';
+    return null;
+}
+
+function decode(blob: Blob): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Image could not be decoded'));
+        img.src = url;
+    });
+}
+
+/**
+ * An image file's bytes as Word takes them. PNG, JPEG and GIF go in as they
+ * are; anything else the browser can show (WebP, HEIC, SVG) is drawn once
+ * and goes in as PNG. Null when it can't be decoded — the alt text stands in.
+ */
+export async function imageFromBytes(bytes: Uint8Array): Promise<ExportImage | null> {
+    const type = sniff(bytes);
+    const img = await decode(new Blob([bytes as Uint8Array<ArrayBuffer>]));
+    URL.revokeObjectURL(img.src);
+    const width = img.naturalWidth;
+    const height = img.naturalHeight;
+    if (!width || !height) return null;
+    if (type) return { data: bytes, type, width, height };
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d')?.drawImage(img, 0, 0);
+    const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (!png) return null;
+    return { data: new Uint8Array(await png.arrayBuffer()), type: 'png', width, height };
+}
+
+/** The file name for an export: the title, made safe. */
+export function exportFileName(title: string, format: string): string {
+    // eslint-disable-next-line no-control-regex
+    const base = title.replace(/[/\\:*?"<>|\u0000-\u001F]/g, '-').trim().replace(/^\.+/, '') || 'PureWrite';
+    return `${base}.${format}`;
+}
+
+export function buildBook(format: EngineFormat, input: EngineInput): Uint8Array {
+    return format === 'epub' ? buildEpub(input) : buildDocx(input);
+}
+
+export type { ExportChapter, ExportImage };
