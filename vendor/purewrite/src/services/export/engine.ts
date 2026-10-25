@@ -2,6 +2,8 @@ import { Editor, type JSONContent } from '@tiptap/core';
 import { editorExtensions } from '../../extensions/editorExtensions';
 import { buildDocx, type ExportChapter, type ExportImage } from './docx';
 import { buildEpub } from './epub';
+import { buildPrintDocument, printPage } from './html';
+import { DEFAULT_TEMPLATE } from './templates';
 
 /**
  * The export engine with nothing of the app in it: Markdown in, the bytes of
@@ -10,7 +12,9 @@ import { buildEpub } from './epub';
  * system. Reading the files is the caller's: exportFolder.ts reads them
  * through the app, the Obsidian plugin through the vault, and both hand the
  * same text to the same parser, so a book exported from either is the same
- * document. PDF is not here: it is laid out by the app's own WebKit (pdf.ts).
+ * document. A PDF is the one format the engine cannot finish alone: it builds
+ * the page (buildPrintPage) and the caller's browser draws it — the app's
+ * WebKit (pdf.ts), Obsidian's Chromium on the desktop.
  */
 
 export type EngineFormat = 'docx' | 'epub';
@@ -89,6 +93,29 @@ export function exportFileName(title: string, format: string): string {
     // eslint-disable-next-line no-control-regex
     const base = title.replace(/[/\\:*?"<>|\u0000-\u001F]/g, '-').trim().replace(/^\.+/, '') || 'PureWrite';
     return `${base}.${format}`;
+}
+
+/** A print-ready page and its paper size, in points. */
+export interface PrintPage {
+    html: string;
+    width: number;
+    height: number;
+}
+
+/**
+ * The book as one HTML page that lays itself out with paged.js (`pagedJs` is
+ * the library's source, which the caller bundles). When it is done it sets
+ * `window.__pwPageCount`, or `window.__pwError`; each `.pagedjs_page` is then
+ * one sheet of `width` × `height` points.
+ */
+export function buildPrintPage(input: EngineInput, pagedJs: string): PrintPage {
+    const template = DEFAULT_TEMPLATE;
+    return {
+        html: printPage(buildPrintDocument({ ...input, template }), pagedJs),
+        // The template measures in twentieths of a point (Word's twips).
+        width: template.page.width / 20,
+        height: template.page.height / 20,
+    };
 }
 
 export function buildBook(format: EngineFormat, input: EngineInput): Uint8Array {

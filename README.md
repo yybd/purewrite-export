@@ -1,18 +1,21 @@
 # PureWrite Export
 
-Book-ready Word and EPUB from a note or a whole folder — real footnotes, tables,
+Book-ready Word, PDF and EPUB from a note or a whole folder — real footnotes, tables,
 lists, images and chapter breaks, with Hebrew and English set correctly side by side.
-Works on desktop and on phones and tablets. Free.
+Works on desktop and on phones and tablets (PDF on desktop). Free.
 
 ## Use
 
-- **A folder:** right-click it → *Export as a book (Word / EPUB)*, or run *Export the
+- **A folder:** right-click it → *Export as a book (Word / PDF / EPUB)*, or run *Export the
   current note's folder as a book*. Every note in it and its subfolders becomes a
   chapter.
-- **A note:** right-click it → *Export as Word / EPUB*, or *Export the current note*.
+- **A note:** right-click it → *Export as Word / PDF / EPUB*, or *Export the current note*.
 
-The file is written into the vault, beside what it was made from. Nothing leaves
-the device.
+The file is written into the vault, beside what it was made from, and the dialog
+offers to open it. Nothing leaves the device. A PDF is laid out with PureWrite's
+own print layout (paged.js) and printed by Obsidian's Chromium, so it is made on
+the desktop only; a phone offers Word and EPUB. The dialog speaks Hebrew when
+Obsidian does.
 
 **Chapter order** is by name (number your notes 01, 02, …), unless the folder holds an
 order saved by PureWrite (below). **Obsidian syntax** is read as Reading view shows

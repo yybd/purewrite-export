@@ -1,6 +1,6 @@
 {
   "name": "purewrite-export",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "description": "Book-ready Word and EPUB from a note or a folder, Hebrew and English alike — PureWrite's export engine in Obsidian.",
   "type": "module",
@@ -36,6 +36,7 @@
     "@tiptap/pm": "2.27.2",
     "@tiptap/starter-kit": "2.27.2",
     "markdown-it": "14.1.1",
+    "pagedjs": "0.4.3",
     "tiptap-markdown": "0.8.10"
   }
 }

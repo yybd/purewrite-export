@@ -1,20 +1,216 @@
-.purewrite-export-chapters {
-    max-height: 12em;
+/*
+ * PureWrite's export dialog (ExportDialog.tsx in the app), in Obsidian's
+ * theme variables: the app's black-on-white is the theme's text on its
+ * background, so a dark theme gets the app's white-on-black.
+ */
+.modal.pwx-modal {
+    width: min(28rem, 92vw);
+    padding: 20px;
+    border-radius: 8px;
+}
+.pwx-modal .modal-title {
+    font-size: 16px;
+    font-weight: 600;
+}
+.pwx {
+    font-size: 14px;
+    color: var(--text-normal);
+}
+.pwx-body {
+    max-height: 60vh;
     overflow-y: auto;
-    margin: 0.4em 0;
-    padding-inline-start: 2em;
+    padding-top: 4px;
+}
+.pwx-label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.pwx-gap {
+    margin-top: 16px;
+}
+.pwx-gap-s {
+    margin-top: 8px;
+}
+.pwx-input[type='text'] {
+    width: 100%;
+    height: auto;
+    padding: 8px 12px;
+    font-size: 14px;
     border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-s);
+    border-radius: 4px;
+    background: transparent;
+    box-shadow: none;
 }
-.purewrite-export-chapters li {
-    padding: 0.15em 0;
+.pwx-input[type='text']:focus {
+    border-color: var(--text-faint);
+    box-shadow: none;
 }
-.purewrite-export-status {
-    min-height: 1.4em;
+.pwx-chapters {
+    max-height: 12rem;
+    overflow-y: auto;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
 }
-.purewrite-export-path {
-    margin: 0.3em 0 0.8em;
+.pwx-chapters li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    min-width: 0;
+}
+.pwx-chapters li + li {
+    border-top: 1px solid var(--background-modifier-border);
+}
+.pwx-number {
+    flex: none;
+    width: 20px;
+    text-align: end;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+}
+.pwx-icon {
+    flex: none;
+    display: inline-flex;
+    color: var(--text-faint);
+}
+.pwx-icon svg {
+    width: 14px;
+    height: 14px;
+}
+.pwx-name,
+.pwx-sub {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+.pwx-sub {
+    margin-inline-start: auto;
+    font-size: 12px;
+    color: var(--text-faint);
+}
+.pwx-hint {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--text-faint);
+}
+.pwx-privacy {
+    margin-top: 12px;
+}
+.pwx-formats {
+    display: flex;
+    margin-top: 16px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.pwx-formats button.pwx-format {
+    flex: 1;
+    height: auto;
+    padding: 6px 0;
+    font-size: 14px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.pwx-formats button.pwx-format:hover {
+    background: var(--background-modifier-hover);
+}
+.pwx-formats button.pwx-format.is-active {
+    background: var(--text-normal);
+    color: var(--background-primary);
+    font-weight: 500;
+}
+.pwx-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+.pwx-check input {
+    margin: 0;
+}
+.pwx-footer {
+    padding-top: 12px;
+}
+.pwx-status {
+    min-height: 0;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+.pwx-status:empty {
+    display: none;
+}
+.pwx-status.is-error {
+    font-size: 14px;
+    color: var(--text-error);
+}
+.pwx button.pwx-primary,
+.pwx button.pwx-secondary {
+    width: 100%;
+    height: auto;
+    padding: 10px 0;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 4px;
+    box-shadow: none;
+    cursor: pointer;
+}
+.pwx button.pwx-primary {
+    border: none;
+    background: var(--text-normal);
+    color: var(--background-primary);
+}
+.pwx button.pwx-secondary {
+    border: 1px solid var(--background-modifier-border);
+    background: transparent;
+    color: var(--text-normal);
+    font-weight: 500;
+}
+.pwx button.pwx-primary:hover {
+    opacity: 0.9;
+}
+.pwx button.pwx-primary:active {
+    opacity: 0.7;
+}
+.pwx button.pwx-primary:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.pwx-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.pwx-saved {
+    margin: 0;
+    font-size: 14px;
+}
+.pwx-path {
+    margin: 6px 0 0;
     font-family: var(--font-monospace);
-    font-size: var(--font-ui-small);
-    word-break: break-all;
+    font-size: 12px;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+.pwx-check input[type='checkbox']:checked {
+    background-color: var(--text-normal);
+    border-color: var(--text-normal);
+}
+.pwx-check input[type='checkbox']:checked::after {
+    background-color: var(--background-primary);
+}
+.pwx-chapters li,
+.pwx-check {
+    font-size: 14px;
 }

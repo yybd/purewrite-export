@@ -1,23 +1,27 @@
-import { App, Modal, Notice, Platform, Plugin, PluginSettingTab, Setting, TFile, TFolder, normalizePath, type TAbstractFile } from 'obsidian';
+import { App, Modal, Notice, Platform, Plugin, PluginSettingTab, TFile, TFolder, normalizePath, setIcon, type TAbstractFile } from 'obsidian';
 import {
     buildBook,
+    buildPrintPage,
     exportFileName,
     imageFromBytes,
     imageSources,
     isRemoteImage,
     parseMarkdown,
-    type EngineFormat,
+    type EngineInput,
     type ExportChapter,
     type ExportImage,
 } from '../vendor/purewrite/src/services/export/engine';
 import { BOOK_FILE, orderByBook, parseBook, serializeBook, type BookSettings } from '../vendor/purewrite/src/services/export/book';
 import { detectDirection, toCommonMark } from './obsidianMarkdown';
+import { pagedJs, pdfAvailable, renderPdf } from './pdf';
+import { isHebrew, t } from './strings';
 
 /**
- * PureWrite Export: a note, or a folder of chapters, as one Word or EPUB
+ * PureWrite Export: a note, or a folder of chapters, as one Word, PDF or EPUB
  * file — built by PureWrite's own export engine (vendor/purewrite, copied
  * from the app by scripts/sync-engine.mjs), so a book exported here is the
- * document the app would make from the same folder.
+ * document the app would make from the same folder. The dialog is the app's
+ * export dialog too: its layout, its words, its black-and-white controls.
  *
  * The folder's settings live in the folder (.purewrite-book.json, see
  * book.ts): the title and switches this export used are written back for the
@@ -26,10 +30,12 @@ import { detectDirection, toCommonMark } from './obsidianMarkdown';
  *
  * Everything runs on the device: nothing is uploaded, and the file is written
  * into the vault, beside what it was made from — which also makes it work on
- * a phone or tablet, where there is no save dialog.
+ * a phone or tablet, where there is no save dialog. PDF is desktop-only: it is
+ * drawn by Chromium (pdf.ts), which a phone's Obsidian does not expose.
  */
 
-const FORMAT_LABELS: Record<EngineFormat, string> = { docx: 'Word', epub: 'EPUB' };
+type Format = 'docx' | 'pdf' | 'epub';
+const FORMAT_LABELS: Record<Format, string> = { docx: 'Word', pdf: 'PDF', epub: 'EPUB' };
 const PUREWRITE_URL = 'https://puretext.bdtech.app/purewrite';
 
 interface Job {
@@ -42,6 +48,14 @@ interface Job {
     /** Where the export is written. */
     outDir: string;
 }
+
+interface Settings {
+    title: string;
+    chapterPageBreak: boolean;
+    firstLineIndent: boolean;
+}
+
+type Progress = { kind: 'reading'; done: number; total: number; file: string } | { kind: 'writing' } | { kind: 'layout'; pages: number };
 
 /**
  * What the desktop app can do with a file it doesn't open itself. Not in the
@@ -83,7 +97,7 @@ export default class PureWriteExport extends Plugin {
     async onload() {
         this.addCommand({
             id: 'export-folder',
-            name: "Export the current note's folder as a book",
+            name: t('commandFolder'),
             checkCallback: (checking) => {
                 const parent = this.app.workspace.getActiveFile()?.parent;
                 if (!parent) return false;
@@ -93,20 +107,20 @@ export default class PureWriteExport extends Plugin {
         });
         this.addCommand({
             id: 'export-note',
-            name: 'Export the current note',
+            name: t('commandNote'),
             checkCallback: (checking) => {
                 const file = this.app.workspace.getActiveFile();
                 if (file?.extension !== 'md') return false;
-                if (!checking) void this.openNote(file);
+                if (!checking) this.openNote(file);
                 return true;
             },
         });
         this.registerEvent(
             this.app.workspace.on('file-menu', (menu, file: TAbstractFile) => {
                 if (file instanceof TFolder) {
-                    menu.addItem((item) => item.setTitle('Export as a book (Word / EPUB)').setIcon('book-open').onClick(() => void this.openFolder(file)));
+                    menu.addItem((item) => item.setTitle(t('menuFolder')).setIcon('book-open').onClick(() => void this.openFolder(file)));
                 } else if (file instanceof TFile && file.extension === 'md') {
-                    menu.addItem((item) => item.setTitle('Export as Word / EPUB').setIcon('file-output').onClick(() => void this.openNote(file)));
+                    menu.addItem((item) => item.setTitle(t('menuNote')).setIcon('file-output').onClick(() => this.openNote(file)));
                 }
             }),
         );
@@ -118,13 +132,13 @@ export default class PureWriteExport extends Plugin {
         const book = parseBook(await this.readText(bookPath));
         const files = orderByBook(notesIn(folder), (f) => relativeTo(folder, f), book.chapters);
         if (!files.length) {
-            new Notice('This folder has no notes to export.');
+            new Notice(t('noNotes'));
             return;
         }
         new ExportModal(this.app, this, { folder, files, bookPath, book, outDir: folderPath(folder) }).open();
     }
 
-    private async openNote(file: TFile) {
+    private openNote(file: TFile) {
         new ExportModal(this.app, this, { folder: null, files: [file], bookPath: null, book: {}, outDir: file.parent ? folderPath(file.parent) : '' }).open();
     }
 
@@ -132,6 +146,15 @@ export default class PureWriteExport extends Plugin {
         // The adapter, not the vault: a dot-file is not in the vault's index.
         try {
             return (await this.app.vault.adapter.exists(path)) ? await this.app.vault.adapter.read(path) : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /** An image file as Word takes it; null when it can't be read or decoded. */
+    private async image(file: TFile): Promise<ExportImage | null> {
+        try {
+            return await imageFromBytes(new Uint8Array(await this.app.vault.readBinary(file)));
         } catch {
             return null;
         }
@@ -161,31 +184,26 @@ export default class PureWriteExport extends Plugin {
         return { name: file.name, doc, images };
     }
 
-    /** An image file as Word takes it; null when it can't be read or decoded. */
-    private async image(file: TFile): Promise<ExportImage | null> {
-        try {
-            return await imageFromBytes(new Uint8Array(await this.app.vault.readBinary(file)));
-        } catch {
-            return null;
-        }
-    }
-
-    async export(job: Job, format: EngineFormat, settings: Required<Omit<BookSettings, 'chapters'>>, onProgress: (text: string) => void): Promise<string> {
+    async export(job: Job, format: Format, settings: Settings, onProgress: (p: Progress) => void): Promise<string> {
         const cache = new Map<string, Promise<ExportImage | null>>();
         const chapters: ExportChapter[] = [];
         for (let i = 0; i < job.files.length; i++) {
-            onProgress(`Reading ${i + 1} of ${job.files.length}: ${job.files[i].basename}`);
+            onProgress({ kind: 'reading', done: i + 1, total: job.files.length, file: job.files[i].basename });
             chapters.push(await this.chapter(job.files[i], cache));
         }
-        onProgress('Writing…');
+        onProgress({ kind: 'writing' });
         const firstText = await this.app.vault.cachedRead(job.files[0]);
-        const bytes = buildBook(format, {
+        const input: EngineInput = {
             title: settings.title,
             chapters,
             defaultDirection: detectDirection(toCommonMark(firstText, { resolve: () => null })),
             chapterPageBreak: settings.chapterPageBreak,
             firstLineIndent: settings.firstLineIndent,
-        });
+        };
+        const bytes =
+            format === 'pdf'
+                ? await renderPdf(buildPrintPage(input, pagedJs), (pages) => onProgress({ kind: 'layout', pages }))
+                : buildBook(format, input);
 
         const out = normalizePath(`${job.outDir}/${exportFileName(settings.title, format)}`);
         const data = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
@@ -211,11 +229,17 @@ export default class PureWriteExport extends Plugin {
     }
 }
 
+/**
+ * PureWrite's export dialog (src/components/ExportDialog.tsx in the app),
+ * built from Obsidian's elements: title field, the numbered chapter list,
+ * the format switch, the two book switches, the privacy line, and one wide
+ * button. Black on white in a light theme, white on black in a dark one —
+ * the app's colours, taken from the theme's text and background.
+ */
 class ExportModal extends Modal {
-    private format: EngineFormat = 'docx';
-    private title: string;
-    private chapterPageBreak: boolean;
-    private firstLineIndent: boolean;
+    private formats: Format[];
+    private format: Format = 'docx';
+    private settings: Settings;
     private running = false;
 
     constructor(
@@ -224,129 +248,144 @@ class ExportModal extends Modal {
         private job: Job,
     ) {
         super(app);
-        this.title = job.book.title ?? (job.folder ? (job.folder.isRoot() ? app.vault.getName() : job.folder.name) : job.files[0].basename);
-        this.chapterPageBreak = job.book.chapterPageBreak ?? true;
-        this.firstLineIndent = job.book.firstLineIndent ?? false;
+        this.formats = pdfAvailable() ? ['docx', 'pdf', 'epub'] : ['docx', 'epub'];
+        this.settings = {
+            title: job.book.title ?? (job.folder ? (job.folder.isRoot() ? app.vault.getName() : job.folder.name) : job.files[0].basename),
+            chapterPageBreak: job.book.chapterPageBreak ?? true,
+            firstLineIndent: job.book.firstLineIndent ?? false,
+        };
     }
 
     onOpen() {
+        this.modalEl.addClass('pwx-modal');
+        if (isHebrew()) this.modalEl.dir = 'rtl';
+        this.setTitle(t(this.job.folder ? 'titleFolder' : 'titleNote'));
         this.render();
     }
 
     private render() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.addClass('purewrite-export');
-        this.setTitle(this.job.folder ? 'Export as a book' : 'Export note');
+        contentEl.addClass('pwx');
+        const body = contentEl.createDiv({ cls: 'pwx-body' });
 
-        new Setting(contentEl).setName('Title').addText((text) => {
-            text.setValue(this.title).onChange((v) => (this.title = v));
-            text.inputEl.dir = 'auto';
-        });
+        body.createEl('label', { cls: 'pwx-label', text: t('documentTitle') });
+        const title = body.createEl('input', { cls: 'pwx-input', type: 'text', value: this.settings.title });
+        title.dir = 'auto';
+        title.spellcheck = false;
+        title.addEventListener('input', () => (this.settings.title = title.value));
 
         if (this.job.folder) {
-            const count = this.job.files.length;
-            contentEl.createDiv({ cls: 'setting-item-description', text: `${count} chapter${count === 1 ? '' : 's'}, in this order:` });
-            const list = contentEl.createEl('ol', { cls: 'purewrite-export-chapters' });
-            for (const file of this.job.files) {
-                const li = list.createEl('li', { text: file.basename });
-                li.dir = 'auto';
-            }
-            contentEl.createDiv({
-                cls: 'setting-item-description',
-                text: this.job.book.chapters
-                    ? 'The order saved by PureWrite. New notes come after it, by name.'
-                    : 'By name. Number the notes (01, 02, …) to order them, or drag them into order in PureWrite.',
+            body.createDiv({ cls: 'pwx-label pwx-gap', text: t('chapters', { count: this.job.files.length }) });
+            const list = body.createEl('ol', { cls: 'pwx-chapters' });
+            this.job.files.forEach((file, i) => {
+                const li = list.createEl('li');
+                li.createSpan({ cls: 'pwx-number', text: String(i + 1) });
+                setIcon(li.createSpan({ cls: 'pwx-icon' }), 'file-text');
+                const name = li.createSpan({ cls: 'pwx-name', text: file.basename });
+                name.dir = 'auto';
+                const sub = relativeTo(this.job.folder!, file);
+                if (sub.includes('/')) {
+                    const where = li.createSpan({ cls: 'pwx-sub', text: sub.slice(0, sub.lastIndexOf('/')) });
+                    where.dir = 'auto';
+                }
+            });
+            body.createEl('p', { cls: 'pwx-hint', text: t(this.job.book.chapters ? 'orderSaved' : 'orderByName') });
+        }
+
+        const formats = body.createDiv({ cls: 'pwx-formats', attr: { role: 'radiogroup', 'aria-label': t('format') } });
+        for (const f of this.formats) {
+            const button = formats.createEl('button', { cls: 'pwx-format', text: FORMAT_LABELS[f], attr: { role: 'radio', 'aria-checked': String(f === this.format) } });
+            if (f === this.format) button.addClass('is-active');
+            button.addEventListener('click', () => {
+                if (this.running || f === this.format) return;
+                this.format = f;
+                this.render();
             });
         }
 
-        new Setting(contentEl).setName('Format').addDropdown((dd) =>
-            dd
-                .addOptions(FORMAT_LABELS)
-                .setValue(this.format)
-                .onChange((v) => {
-                    this.format = v as EngineFormat;
-                    this.render();
-                }),
-        );
         // An EPUB has no pages to break: every chapter is a file of its own.
-        if (this.job.folder && this.format !== 'epub') {
-            new Setting(contentEl)
-                .setName('Each chapter on a new page')
-                .addToggle((t) => t.setValue(this.chapterPageBreak).onChange((v) => (this.chapterPageBreak = v)));
+        const breaks = Boolean(this.job.folder) && this.format !== 'epub';
+        if (breaks) {
+            this.checkbox(body, t('pageBreaks'), this.settings.chapterPageBreak, (v) => (this.settings.chapterPageBreak = v)).addClass('pwx-gap');
         }
-        new Setting(contentEl)
-            .setName('Indent paragraphs')
-            .setDesc('A book’s first-line indent, with no blank line between paragraphs.')
-            .addToggle((t) => t.setValue(this.firstLineIndent).onChange((v) => (this.firstLineIndent = v)));
+        this.checkbox(body, t('firstLineIndent'), this.settings.firstLineIndent, (v) => (this.settings.firstLineIndent = v)).addClass(breaks ? 'pwx-gap-s' : 'pwx-gap');
+        body.createEl('p', { cls: 'pwx-hint pwx-privacy', text: t('privacy') });
 
-        const status = contentEl.createDiv({ cls: 'setting-item-description purewrite-export-status' });
-        new Setting(contentEl).addButton((b) =>
-            b
-                .setButtonText(`Export ${FORMAT_LABELS[this.format]}`)
-                .setCta()
-                .onClick(async () => {
-                    if (this.running) return;
-                    this.running = true;
-                    b.setDisabled(true);
-                    try {
-                        const title = this.title.trim() || this.job.files[0].basename;
-                        const path = await this.plugin.export(
-                            this.job,
-                            this.format,
-                            { title, chapterPageBreak: this.chapterPageBreak, firstLineIndent: this.firstLineIndent },
-                            (text) => status.setText(text),
-                        );
-                        this.showDone(path);
-                    } catch (e) {
-                        console.error('PureWrite Export failed', e);
-                        status.setText(`Export failed: ${(e as Error)?.message ?? e}`);
-                        this.running = false;
-                        b.setDisabled(false);
-                    }
-                }),
-        );
+        const footer = contentEl.createDiv({ cls: 'pwx-footer' });
+        const status = footer.createDiv({ cls: 'pwx-status' });
+        const save = footer.createEl('button', { cls: 'pwx-primary', text: t('save', { format: FORMAT_LABELS[this.format] }) });
+        save.addEventListener('click', () => void this.start(save, status));
+    }
+
+    private checkbox(parent: HTMLElement, text: string, checked: boolean, onChange: (v: boolean) => void): HTMLElement {
+        const label = parent.createEl('label', { cls: 'pwx-check' });
+        const box = label.createEl('input', { type: 'checkbox' });
+        box.checked = checked;
+        box.addEventListener('change', () => onChange(box.checked));
+        label.appendText(text);
+        return label;
+    }
+
+    private async start(button: HTMLButtonElement, status: HTMLElement) {
+        if (this.running) return;
+        this.running = true;
+        button.disabled = true;
+        status.removeClass('is-error');
+        try {
+            const title = this.settings.title.trim() || this.job.files[0].basename;
+            const path = await this.plugin.export(this.job, this.format, { ...this.settings, title }, (p) => {
+                status.setText(
+                    p.kind === 'reading'
+                        ? t('progress', { file: p.file, done: p.done, total: p.total })
+                        : p.kind === 'layout'
+                          ? t('layingOut', { count: p.pages || '' }).trim()
+                          : t('writing'),
+                );
+            });
+            this.showDone(path);
+        } catch (e) {
+            console.error('PureWrite Export failed', e);
+            status.addClass('is-error');
+            status.setText(t('failed', { message: (e as Error)?.message ?? String(e) }));
+            this.running = false;
+            button.disabled = false;
+        }
     }
 
     /**
      * The export's result, in the dialog. Closing it with a Notice was too
      * quiet: Obsidian's file list hides .docx and .epub unless "Detect all
      * file extensions" is on, so the file appeared nowhere and the export
-     * looked as if it had done nothing.
+     * looked as if it had done nothing. A PDF Obsidian opens itself.
      */
     private showDone(path: string) {
         const { contentEl } = this;
         contentEl.empty();
-        this.setTitle('Exported');
-        contentEl.createDiv({ cls: 'setting-item-description', text: 'Saved to' });
-        const where = contentEl.createDiv({ cls: 'purewrite-export-path', text: path });
+        const body = contentEl.createDiv({ cls: 'pwx-body' });
+        body.createEl('p', { cls: 'pwx-saved', text: t('saved') });
+        const where = body.createDiv({ cls: 'pwx-path', text: path });
         where.dir = 'auto';
 
-        const desktop = this.app as unknown as DesktopApp;
+        const isPdf = path.toLowerCase().endsWith('.pdf');
         const shown = (this.app.vault as unknown as VaultConfig).getConfig?.('showUnsupportedFiles');
-        if (shown === false) {
-            contentEl.createDiv({
-                cls: 'setting-item-description',
-                text: 'Obsidian’s file list shows Word and EPUB files only with Settings → Files and links → Detect all file extensions.',
+        if (!isPdf && shown === false) body.createEl('p', { cls: 'pwx-hint', text: t('hidden') });
+
+        const desktop = this.app as unknown as DesktopApp;
+        const footer = contentEl.createDiv({ cls: 'pwx-footer pwx-actions' });
+        if (Platform.isDesktopApp && desktop.showInFolder) {
+            footer.createEl('button', { cls: 'pwx-secondary', text: t('reveal') }).addEventListener('click', () => desktop.showInFolder!(path));
+        }
+        const file = this.app.vault.getFileByPath(path);
+        const canOpen = Boolean((isPdf && file) || (Platform.isDesktopApp && desktop.openWithDefaultApp));
+        if (canOpen) {
+            footer.createEl('button', { cls: 'pwx-primary', text: t('open') }).addEventListener('click', () => {
+                if (isPdf && file) void this.app.workspace.getLeaf('tab').openFile(file);
+                else desktop.openWithDefaultApp!(path);
+                this.close();
             });
         }
-
-        const buttons = new Setting(contentEl);
-        if (Platform.isDesktopApp && desktop.showInFolder) {
-            buttons.addButton((b) => b.setButtonText('Show in folder').onClick(() => desktop.showInFolder!(path)));
-        }
-        if (Platform.isDesktopApp && desktop.openWithDefaultApp) {
-            buttons.addButton((b) =>
-                b
-                    .setButtonText('Open')
-                    .setCta()
-                    .onClick(() => {
-                        desktop.openWithDefaultApp!(path);
-                        this.close();
-                    }),
-            );
-        }
-        buttons.addButton((b) => b.setButtonText('Done').onClick(() => this.close()));
+        footer.createEl('button', { cls: canOpen ? 'pwx-secondary' : 'pwx-primary', text: t('done') }).addEventListener('click', () => this.close());
     }
 
     onClose() {
@@ -362,10 +401,8 @@ class AboutTab extends PluginSettingTab {
     display() {
         const { containerEl } = this;
         containerEl.empty();
-        containerEl.createEl('p', {
-            text: 'Exports are built by the export engine of PureWrite, a focused Markdown writer for Mac, iPhone and iPad. A folder exported here and in PureWrite is the same document, and the two share its settings (.purewrite-book.json in the folder).',
-        });
+        containerEl.createEl('p', { text: t('about') });
         const p = containerEl.createEl('p');
-        p.createEl('a', { text: 'About PureWrite', href: PUREWRITE_URL });
+        p.createEl('a', { text: t('aboutLink'), href: PUREWRITE_URL });
     }
 }
