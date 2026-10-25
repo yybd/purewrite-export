@@ -222,9 +222,8 @@
 }
 .pwx-credit a {
     color: inherit;
-    text-decoration: underline;
-    text-decoration-color: var(--background-modifier-border);
-    text-underline-offset: 2px;
+    text-decoration: none;
+    border-bottom: 1px solid var(--background-modifier-border);
 }
 .pwx-credit a:hover {
     color: var(--text-muted);

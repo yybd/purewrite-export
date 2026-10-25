@@ -27,14 +27,14 @@ function splitCode(text: string): { code: boolean; text: string }[] {
         for (const m of prose.matchAll(inline)) {
             parts.push({ code: false, text: prose.slice(at, m.index) });
             parts.push({ code: true, text: m[0] });
-            at = m.index! + m[0].length;
+            at = m.index + m[0].length;
         }
         parts.push({ code: false, text: prose.slice(at) });
     };
     for (const m of text.matchAll(fence)) {
         pushProse(text.slice(last, m.index));
         parts.push({ code: true, text: m[0] });
-        last = m.index! + m[0].length;
+        last = m.index + m[0].length;
     }
     pushProse(text.slice(last));
     return parts;
@@ -103,8 +103,8 @@ export function toCommonMark(text: string, resolver: Resolver): string {
         .join('');
 }
 
-const RTL = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
-const LTR = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]/;
+const RTL = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+const LTR = /[A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF]/;
 
 /** The book's default direction: that of its first strong letter. */
 export function detectDirection(text: string): 'rtl' | 'ltr' {

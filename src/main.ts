@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Platform, Plugin, PluginSettingTab, TFile, TFolder, normalizePath, setIcon, type TAbstractFile } from 'obsidian';
+import { App, Modal, Notice, Platform, Plugin, TFile, TFolder, normalizePath, setIcon, type TAbstractFile } from 'obsidian';
 import {
     buildBook,
     buildPrintPage,
@@ -38,6 +38,8 @@ import purewriteIcon from '../assets/purewrite-icon.png';
 type Format = 'docx' | 'pdf' | 'epub';
 const FORMAT_LABELS: Record<Format, string> = { docx: 'Word', pdf: 'PDF', epub: 'EPUB' };
 const PUREWRITE_URL = 'https://puretext.bdtech.app/purewrite';
+/** The app's name, which is a name and keeps its capitals. */
+const APP_NAME = 'PureWrite';
 
 interface Job {
     /** The folder being exported, or null for a single note. */
@@ -64,8 +66,8 @@ type Progress = { kind: 'reading'; done: number; total: number; file: string } |
  * exists and the dialog says where the file is.
  */
 interface DesktopApp {
-    openWithDefaultApp?(path: string): void;
-    showInFolder?(path: string): void;
+    openWithDefaultApp?: (path: string) => void;
+    showInFolder?: (path: string) => void;
 }
 interface VaultConfig {
     getConfig?(key: string): unknown;
@@ -125,7 +127,6 @@ export default class PureWriteExport extends Plugin {
                 }
             }),
         );
-        this.addSettingTab(new AboutTab(this.app, this));
     }
 
     private async openFolder(folder: TFolder) {
@@ -325,7 +326,7 @@ class ExportModal extends Modal {
         const line = parent.createEl('p', { cls: 'pwx-credit' });
         const [before, after = ''] = t('credit').split('{app}');
         line.appendText(before);
-        line.createEl('a', { text: 'PureWrite', href: PUREWRITE_URL });
+        line.createEl('a', { text: APP_NAME, href: PUREWRITE_URL });
         line.appendText(after);
     }
 
@@ -409,26 +410,12 @@ class ExportModal extends Modal {
         const card = parent.createEl('a', { cls: 'pwx-card', href: PUREWRITE_URL });
         card.createEl('img', { cls: 'pwx-card-icon', attr: { src: purewriteIcon, alt: '', width: '40', height: '40' } });
         const text = card.createDiv({ cls: 'pwx-card-text' });
-        text.createDiv({ cls: 'pwx-card-title', text: 'PureWrite' });
+        text.createDiv({ cls: 'pwx-card-title', text: APP_NAME });
         text.createDiv({ cls: 'pwx-card-body', text: t('cardText') });
         text.createDiv({ cls: 'pwx-card-link', text: `${t('cardLink')} ${isHebrew() ? '←' : '→'}` });
     }
 
     onClose() {
         this.contentEl.empty();
-    }
-}
-
-/**
- * Nothing to set — every choice is made per export, and remembered in the
- * book's folder. The tab says where the engine comes from.
- */
-class AboutTab extends PluginSettingTab {
-    display() {
-        const { containerEl } = this;
-        containerEl.empty();
-        containerEl.createEl('p', { text: t('about') });
-        const p = containerEl.createEl('p');
-        p.createEl('a', { text: t('aboutLink'), href: PUREWRITE_URL });
     }
 }

@@ -51,7 +51,7 @@ whichever app made it.
 
 ```bash
 pnpm install
-pnpm build       # builds main.js from the committed vendor/
+pnpm build       # builds main.js from the committed vendor/, linted with Obsidian's rules
 pnpm test
 ```
 
@@ -61,6 +61,13 @@ Updating the engine needs the PureWrite repository, which is not public:
 PUREWRITE=<path to PureWrite> pnpm sync-engine   # copy the engine again
 PUREWRITE=<path to PureWrite> pnpm build         # fails if vendor/ is stale
 ```
+
+## Releasing
+
+Bump `version` in `manifest.json` and `package.json`, add it to `versions.json`,
+commit, then push an annotated tag with that version and the release notes as its
+message (`git tag -a 0.2.3 -m "…"`). The Release workflow builds, attests the files
+and publishes them.
 
 ## License
 
