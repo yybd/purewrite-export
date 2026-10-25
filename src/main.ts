@@ -141,19 +141,20 @@ export default class PureWriteExport extends Plugin {
             }
             const image = this.app.vault.getFileByPath(path);
             if (!image) continue;
-            if (!cache.has(path)) {
-                cache.set(
-                    path,
-                    this.app.vault
-                        .readBinary(image)
-                        .then((buffer) => imageFromBytes(new Uint8Array(buffer)))
-                        .catch(() => null),
-                );
-            }
+            if (!cache.has(path)) cache.set(path, this.image(image));
             const loaded = await cache.get(path)!;
             if (loaded) images.set(src, loaded);
         }
         return { name: file.name, doc, images };
+    }
+
+    /** An image file as Word takes it; null when it can't be read or decoded. */
+    private async image(file: TFile): Promise<ExportImage | null> {
+        try {
+            return await imageFromBytes(new Uint8Array(await this.app.vault.readBinary(file)));
+        } catch {
+            return null;
+        }
     }
 
     async export(job: Job, format: EngineFormat, settings: Required<Omit<BookSettings, 'chapters'>>, onProgress: (text: string) => void): Promise<string> {
@@ -190,7 +191,7 @@ export default class PureWriteExport extends Plugin {
             try {
                 await this.app.vault.adapter.write(job.bookPath, serializeBook(changes, await this.readText(job.bookPath)));
             } catch (e) {
-                console.warn('PureWrite Export: could not save the book file', e);
+                console.error('PureWrite Export: could not save the book file', e);
             }
         }
         return out;

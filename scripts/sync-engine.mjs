@@ -3,6 +3,7 @@
 //
 //   PUREWRITE=<PureWrite repo> node scripts/sync-engine.mjs           copy
 //   PUREWRITE=<PureWrite repo> node scripts/sync-engine.mjs --check   fail if vendor/ differs
+//   node scripts/sync-engine.mjs --check                              no PureWrite here: pass
 //
 // Never edit vendor/ by hand: a fix belongs in PureWrite, then a sync.
 import { execFileSync } from 'node:child_process';
@@ -10,11 +11,17 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { dirname, join } from 'node:path';
 
 const source = process.env.PUREWRITE;
+const check = process.argv.includes('--check');
 if (!source || !existsSync(join(source, 'src/services/export/engine.ts'))) {
+    // Without the app there is nothing to compare against: the committed
+    // vendor/ is the engine, and the build uses it as it is.
+    if (check) {
+        console.log(`PUREWRITE not set: building with vendor/ as committed (${readFileSync(join('vendor/purewrite', 'SOURCE'), 'utf8').split('\n')[0]}).`);
+        process.exit(0);
+    }
     console.error('Set PUREWRITE to the PureWrite repository.');
     process.exit(1);
 }
-const check = process.argv.includes('--check');
 const target = 'vendor/purewrite';
 
 const EXPORT = ['engine', 'book', 'docx', 'epub', 'html', 'direction', 'templates', 'zip'];

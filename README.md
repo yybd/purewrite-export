@@ -2,7 +2,7 @@
 
 Book-ready Word and EPUB from a note or a whole folder — real footnotes, tables,
 lists, images and chapter breaks, with Hebrew and English set correctly side by side.
-Works on desktop, iPhone and iPad, with nothing to install. Free.
+Works on desktop and on phones and tablets. Free.
 
 ## Use
 
@@ -18,6 +18,12 @@ the device.
 order saved by PureWrite (below). **Obsidian syntax** is read as Reading view shows
 it: image embeds become images, wikilinks their text, callouts quotes with a bold
 title; front matter, `%%comments%%` and block ids are left out.
+
+## Install
+
+From Obsidian: *Settings → Community plugins → Browse*, search for **PureWrite Export**.
+By hand: copy `main.js`, `manifest.json` and `styles.css` from the latest
+[release](../../releases/latest) into `<vault>/.obsidian/plugins/purewrite-export/`.
 
 ## The engine, and PureWrite
 
@@ -36,7 +42,19 @@ whichever app made it.
 `vendor/purewrite/` is PureWrite's engine, copied file for file — never edit it here.
 
 ```bash
-PUREWRITE=<path to PureWrite> pnpm sync-engine   # copy the engine again
-pnpm build                                       # fails if vendor/ is stale
+pnpm install
+pnpm build       # builds main.js from the committed vendor/
 pnpm test
 ```
+
+Updating the engine needs the PureWrite repository, which is not public:
+
+```bash
+PUREWRITE=<path to PureWrite> pnpm sync-engine   # copy the engine again
+PUREWRITE=<path to PureWrite> pnpm build         # fails if vendor/ is stale
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE). That covers this repository, the engine in
+`vendor/purewrite/` included; it does not cover the PureWrite app.

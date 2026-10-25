@@ -1,9 +1,10 @@
 {
-  "id": "purewrite-export",
-  "name": "PureWrite Export",
-  "version": "0.1.0",
-  "minAppVersion": "1.6.0",
-  "description": "Book-ready Word and EPUB from a note or a whole folder: real footnotes, tables, images and chapter breaks, Hebrew and English alike. Works on desktop and mobile, with nothing to install.",
-  "author": "yybd",
-  "isDesktopOnly": false
+    "id": "purewrite-export",
+    "name": "PureWrite Export",
+    "version": "0.1.0",
+    "minAppVersion": "1.6.0",
+    "description": "Export a note or a whole folder as a book-ready Word or EPUB file, with real footnotes, tables, images and chapter breaks, in Hebrew and English alike.",
+    "author": "yybd",
+    "isDesktopOnly": false,
+    "authorUrl": "https://puretext.bdtech.app"
 }

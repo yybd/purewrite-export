@@ -1,4 +1,4 @@
-PureWrite 4bc1a23
+PureWrite ec6ff37
 src/services/export/engine.ts
 src/services/export/book.ts
 src/services/export/docx.ts
