@@ -37,8 +37,8 @@ export interface BookSettings {
 function asObject(text: string | null | undefined): Record<string, unknown> {
     if (!text) return {};
     try {
-        const parsed = JSON.parse(text);
-        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+        const parsed: unknown = JSON.parse(text);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
     } catch {
         return {};
     }

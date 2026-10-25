@@ -16,7 +16,7 @@ export const LinkWithTitle = Link.extend({
             title: {
                 default: null,
                 parseHTML: (element: HTMLElement) => element.getAttribute('title'),
-                renderHTML: (attributes: Record<string, any>) =>
+                renderHTML: (attributes: { title?: string | null }) =>
                     attributes.title ? { title: attributes.title } : {},
             },
         };

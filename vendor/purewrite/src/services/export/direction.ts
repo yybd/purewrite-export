@@ -21,7 +21,7 @@ const DIGIT = /\p{Nd}/u;
 
 /** One direction per code point of `chars`, in a paragraph of `paragraph` direction. */
 export function resolveDirections(chars: readonly string[], paragraph: Dir): Dir[] {
-    const out: (Dir | null)[] = new Array(chars.length).fill(null);
+    const out = new Array<Dir | null>(chars.length).fill(null);
     let previousStrong: Dir = paragraph;
     for (let i = 0; i < chars.length; i++) {
         const ch = chars[i];

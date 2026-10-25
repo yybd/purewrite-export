@@ -223,7 +223,7 @@ class DocxWriter {
 
     addChapter(chapter: ExportChapter, pageBreak: boolean) {
         this.definitions = new Map();
-        this.images = chapter.images ?? new Map();
+        this.images = chapter.images ?? new Map<string, ExportImage>();
         for (const node of chapter.doc.content ?? []) {
             if (node.type === 'footnoteDefinition') this.definitions.set(String(node.attrs?.label), node);
         }
@@ -350,7 +350,7 @@ class DocxWriter {
         const indent = this.indentFor(ctx) ?? (ctx.firstLine ? `<w:ind w:firstLine="${FIRST_LINE_INDENT}"/>` : null);
         if (indent !== null) pPr += indent;
         if (ctx.tight) pPr += '<w:contextualSpacing/>';
-        const jc = this.justification(node.attrs?.textAlign ?? ctx.align ?? null, rtl, isImageOnly(node));
+        const jc = this.justification((node.attrs?.textAlign as string | null | undefined) ?? ctx.align ?? null, rtl, isImageOnly(node));
         if (jc) pPr += `<w:jc w:val="${jc}"/>`;
 
         let runs = '';
@@ -418,7 +418,7 @@ class DocxWriter {
                 for (const child of cell.content ?? []) {
                     // Cells resolve their own direction: an English cell in a Hebrew table stays left-to-right.
                     const content = isHeader ? boldAll(child) : child;
-                    this.block(content, { align: cell.attrs?.alignment ?? null, style: 'TableText' }, cellOut);
+                    this.block(content, { align: (cell.attrs?.alignment as string | null | undefined) ?? null, style: 'TableText' }, cellOut);
                 }
                 // A cell must end in a paragraph.
                 if (!cellOut.length || !cellOut[cellOut.length - 1].startsWith('<w:p>')) cellOut.push('<w:p/>');

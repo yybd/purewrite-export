@@ -1,6 +1,10 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
+import type { MarkdownSerializerState } from '@tiptap/pm/markdown';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import type MarkdownIt from 'markdown-it';
+import type StateBlock from 'markdown-it/lib/rules_block/state_block.mjs';
+import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs';
 
 /**
  * Markdown footnotes: `text[^1]` and, anywhere in the file, `[^1]: the note`.
@@ -23,13 +27,24 @@ const COLON = 0x3a; // :
 const SPACE = 0x20;
 const TAB = 0x09;
 
+/** What a footnote token carries in `meta`. */
+interface FootnoteMeta {
+    label: string;
+}
+
+/**
+ * The block state while a definition is parsed: markdown-it-footnote's own
+ * parent type, which the typings' list of parent types does not name.
+ */
+type FootnoteStateBlock = Omit<StateBlock, 'parentType'> & { parentType: StateBlock['parentType'] | 'footnote' };
+
 function escapeHtml(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // `[^label]: text` — continuation lines are indented four spaces. This is
 // markdown-it-footnote's own block rule, minus the collecting.
-function footnoteDefinition(state: any, startLine: number, endLine: number, silent: boolean): boolean {
+function footnoteDefinition(state: StateBlock, startLine: number, endLine: number, silent: boolean): boolean {
     const start = state.bMarks[startLine] + state.tShift[startLine];
     const max = state.eMarks[startLine];
     if (start + 4 > max) return false;
@@ -69,7 +84,7 @@ function footnoteDefinition(state: any, startLine: number, endLine: number, sile
     state.sCount[startLine] = offset - initial;
     state.bMarks[startLine] = posAfterColon;
     state.blkIndent += 4;
-    state.parentType = 'footnote';
+    (state as FootnoteStateBlock).parentType = 'footnote';
     if (state.sCount[startLine] < state.blkIndent) state.sCount[startLine] += state.blkIndent;
 
     state.md.block.tokenize(state, startLine, endLine);
@@ -85,7 +100,7 @@ function footnoteDefinition(state: any, startLine: number, endLine: number, sile
 }
 
 // `[^label]` inside a line.
-function footnoteReference(state: any, silent: boolean): boolean {
+function footnoteReference(state: StateInline, silent: boolean): boolean {
     const start = state.pos;
     const max = state.posMax;
     if (start + 3 >= max) return false;
@@ -111,18 +126,18 @@ export function footnotePlugin(md: MarkdownIt): void {
     md.block.ruler.before('reference', 'footnote_def', footnoteDefinition, { alt: ['paragraph', 'reference'] });
     md.inline.ruler.before('link', 'footnote_ref', footnoteReference);
     md.renderer.rules.footnote_def_open = (tokens, idx) =>
-        `<div data-footnote-def="${escapeHtml(tokens[idx].meta.label)}">`;
+        `<div data-footnote-def="${escapeHtml((tokens[idx].meta as FootnoteMeta).label)}">`;
     md.renderer.rules.footnote_def_close = () => '</div>\n';
     md.renderer.rules.footnote_ref = (tokens, idx) => {
-        const label = escapeHtml(tokens[idx].meta.label);
+        const label = escapeHtml((tokens[idx].meta as FootnoteMeta).label);
         return `<sup data-footnote-ref="${label}">${label}</sup>`;
     };
 }
 
 /** The next free numeric label — `1` in a document with none. */
-export function nextFootnoteLabel(doc: any): string {
+export function nextFootnoteLabel(doc: ProseMirrorNode): string {
     let max = 0;
-    doc.descendants((node: any) => {
+    doc.descendants((node) => {
         if (node.type.name === 'footnoteReference' || node.type.name === 'footnoteDefinition') {
             const n = Number(node.attrs.label);
             if (Number.isInteger(n) && n > max) max = n;
@@ -152,7 +167,7 @@ export const FootnoteReference = Node.create({
             label: {
                 default: '1',
                 parseHTML: (el: HTMLElement) => el.getAttribute('data-footnote-ref'),
-                renderHTML: (attrs: Record<string, any>) => ({ 'data-footnote-ref': attrs.label }),
+                renderHTML: (attrs: { label?: string }) => ({ 'data-footnote-ref': attrs.label }),
             },
         };
     },
@@ -171,7 +186,7 @@ export const FootnoteReference = Node.create({
     addStorage() {
         return {
             markdown: {
-                serialize(state: any, node: any) {
+                serialize(state: MarkdownSerializerState, node: ProseMirrorNode) {
                     state.write(`[^${node.attrs.label}]`);
                 },
                 parse: {
@@ -212,7 +227,7 @@ export const FootnoteReference = Node.create({
                     // A click on a reference goes to its note.
                     handleClickOn(view, _pos, node) {
                         if (node.type.name !== 'footnoteReference') return false;
-                        const label = node.attrs.label;
+                        const label = node.attrs.label as string;
                         let target = -1;
                         view.state.doc.descendants((n, p) => {
                             if (target === -1 && n.type.name === 'footnoteDefinition' && n.attrs.label === label) target = p;
@@ -240,7 +255,7 @@ export const FootnoteDefinition = Node.create({
             label: {
                 default: '1',
                 parseHTML: (el: HTMLElement) => el.getAttribute('data-footnote-def'),
-                renderHTML: (attrs: Record<string, any>) => ({ 'data-footnote-def': attrs.label }),
+                renderHTML: (attrs: { label?: string }) => ({ 'data-footnote-def': attrs.label }),
             },
         };
     },
@@ -256,7 +271,7 @@ export const FootnoteDefinition = Node.create({
     addStorage() {
         return {
             markdown: {
-                serialize(state: any, node: any) {
+                serialize(state: MarkdownSerializerState, node: ProseMirrorNode) {
                     state.wrapBlock('    ', `[^${node.attrs.label}]: `, node, () => state.renderContent(node));
                 },
                 parse: {

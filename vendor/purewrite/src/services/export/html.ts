@@ -107,7 +107,7 @@ export class HtmlWriter {
 
     chapter(chapter: ExportChapter): string {
         this.definitions = new Map();
-        this.images = chapter.images ?? new Map();
+        this.images = chapter.images ?? new Map<string, ExportImage>();
         this.notes = [];
         this.headings = [];
         for (const node of chapter.doc.content ?? []) {

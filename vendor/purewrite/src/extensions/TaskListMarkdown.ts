@@ -1,4 +1,7 @@
 import { Extension } from '@tiptap/core';
+import type MarkdownIt from 'markdown-it';
+import type StateCore from 'markdown-it/lib/rules_core/state_core.mjs';
+import type Token from 'markdown-it/lib/token.mjs';
 
 /**
  * Task lists that survive a round-trip.
@@ -18,12 +21,17 @@ import { Extension } from '@tiptap/core';
 
 const SPLIT_RULE = 'purewrite-split-mixed-lists';
 
-function isTaskItem(token: any): boolean {
+/** The one part of markdown-it's Ruler its typings leave out: the rule list. */
+interface RulerInternals {
+    __rules__: Array<{ name: string }>;
+}
+
+function isTaskItem(token: Token): boolean {
     return (token.attrGet('class') ?? '').split(' ').includes('task-list-item');
 }
 
 /** Index of the token closing the one opened at `open`. */
-function closingIndex(tokens: any[], open: number): number {
+function closingIndex(tokens: Token[], open: number): number {
     const closeType = tokens[open].type.replace(/_open$/, '_close');
     for (let i = open + 1; i < tokens.length; i += 1) {
         if (tokens[i].type === closeType && tokens[i].level === tokens[open].level) return i;
@@ -31,8 +39,8 @@ function closingIndex(tokens: any[], open: number): number {
     return tokens.length - 1;
 }
 
-function splitMixedLists(state: any) {
-    const tokens: any[] = state.tokens;
+function splitMixedLists(state: StateCore) {
+    const tokens = state.tokens;
     const lines: string[] = state.src.split('\n');
     const isBlank = (line: number) => line >= 0 && (lines[line] ?? '').trim() === '';
 
@@ -59,15 +67,15 @@ function splitMixedLists(state: any) {
             else runs.push([item]);
         }
 
-        const Token = tokens[open].constructor;
-        const rebuilt: any[] = [];
+        const MarkdownToken = tokens[open].constructor as typeof Token;
+        const rebuilt: Token[] = [];
         for (const run of runs) {
-            const listOpen = new Token('bullet_list_open', 'ul', 1);
+            const listOpen = new MarkdownToken('bullet_list_open', 'ul', 1);
             listOpen.markup = tokens[open].markup;
             listOpen.level = level;
             listOpen.block = true;
             if (run[0].task) listOpen.attrSet('class', 'contains-task-list');
-            const listClose = new Token('bullet_list_close', 'ul', -1);
+            const listClose = new MarkdownToken('bullet_list_close', 'ul', -1);
             listClose.markup = tokens[close].markup;
             listClose.level = level;
             listClose.block = true;
@@ -78,7 +86,7 @@ function splitMixedLists(state: any) {
                 const paragraphs = tokens
                     .slice(item.start, item.end)
                     .filter((t) => t.type === 'paragraph_open' && t.level === level + 2).length;
-                return paragraphs <= 1 && (k === 0 || !isBlank(tokens[item.start].map[0] - 1));
+                return paragraphs <= 1 && (k === 0 || !isBlank(tokens[item.start].map![0] - 1));
             });
 
             rebuilt.push(listOpen);
@@ -111,7 +119,7 @@ export const TaskListMarkdown = Extension.create({
                         default: true,
                         parseHTML: (element: HTMLElement) =>
                             element.getAttribute('data-tight') === 'true' || !element.querySelector('p'),
-                        renderHTML: (attributes: Record<string, any>) =>
+                        renderHTML: (attributes: { tight?: boolean }) =>
                             attributes.tight ? { 'data-tight': 'true' } : {},
                     },
                 },
@@ -126,8 +134,9 @@ export const TaskListMarkdown = Extension.create({
                     // Called before every parse; the rule goes in once, at the
                     // end of the core chain — after the task-list plugin has
                     // marked which items are tasks.
-                    setup(markdownit: any) {
-                        if (markdownit.core.ruler.__rules__.some((rule: any) => rule.name === SPLIT_RULE)) return;
+                    setup(markdownit: MarkdownIt) {
+                        const ruler = markdownit.core.ruler as typeof markdownit.core.ruler & RulerInternals;
+                        if (ruler.__rules__.some((rule) => rule.name === SPLIT_RULE)) return;
                         markdownit.core.ruler.push(SPLIT_RULE, splitMixedLists);
                     },
                 },

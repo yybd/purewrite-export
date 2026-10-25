@@ -79,7 +79,10 @@ export async function imageFromBytes(bytes: Uint8Array): Promise<ExportImage | n
     if (!width || !height) return null;
     if (type) return { data: bytes, type, width, height };
 
-    const canvas = document.createElement('canvas');
+    // createElementNS, not createElement: the same <canvas>, and the one
+    // spelling Obsidian's review accepts without its own createEl, which the
+    // app does not have (and OffscreenCanvas is not on macOS 11 / iOS 14).
+    const canvas = document.createElementNS('http://www.w3.org/1999/xhtml', 'canvas') as HTMLCanvasElement;
     canvas.width = width;
     canvas.height = height;
     canvas.getContext('2d')?.drawImage(img, 0, 0);

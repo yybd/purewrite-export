@@ -1,6 +1,8 @@
 import Table from '@tiptap/extension-table';
 import TableHeader from '@tiptap/extension-table-header';
 import TableCell from '@tiptap/extension-table-cell';
+import type { MarkdownSerializerState } from '@tiptap/pm/markdown';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 /**
  * GFM tables that survive a round-trip.
@@ -26,6 +28,12 @@ import TableCell from '@tiptap/extension-table-cell';
 
 type Alignment = 'left' | 'center' | 'right' | null;
 
+/**
+ * The serializer state as tiptap-markdown hands it over: prosemirror-markdown's,
+ * plus the `inTable` flag tiptap-markdown adds (its hard break reads it).
+ */
+type TableSerializerState = MarkdownSerializerState & { inTable: boolean };
+
 const ALIGNMENT_ATTRIBUTE = {
     alignment: {
         default: null as Alignment,
@@ -33,7 +41,7 @@ const ALIGNMENT_ATTRIBUTE = {
             const value = element.style.textAlign;
             return value === 'left' || value === 'center' || value === 'right' ? value : null;
         },
-        renderHTML: (attributes: Record<string, any>) =>
+        renderHTML: (attributes: { alignment?: Alignment }) =>
             attributes.alignment ? { style: `text-align: ${attributes.alignment}` } : {},
     },
 };
@@ -50,22 +58,22 @@ export const TableCellWithAlignment = TableCell.extend({
     },
 });
 
-function rowsOf(node: any): any[] {
-    const rows: any[] = [];
-    node.forEach((row: any) => rows.push(row));
+function rowsOf(node: ProseMirrorNode): ProseMirrorNode[] {
+    const rows: ProseMirrorNode[] = [];
+    node.forEach((row) => rows.push(row));
     return rows;
 }
 
-function cellsOf(row: any): any[] {
-    const cells: any[] = [];
-    row.forEach((cell: any) => cells.push(cell));
+function cellsOf(row: ProseMirrorNode): ProseMirrorNode[] {
+    const cells: ProseMirrorNode[] = [];
+    row.forEach((cell) => cells.push(cell));
     return cells;
 }
 
 /** The `---` / `:---:` line, taken from the header row's cells. */
-function delimiterRow(headerCells: any[], columns: number): string {
+function delimiterRow(headerCells: ProseMirrorNode[], columns: number): string {
     const marks = Array.from({ length: columns }, (_, i) => {
-        const alignment: Alignment = headerCells[i]?.attrs.alignment ?? null;
+        const alignment = (headerCells[i]?.attrs.alignment as Alignment | undefined) ?? null;
         return alignment === 'center' ? ':---:'
             : alignment === 'left' ? ':---'
                 : alignment === 'right' ? '---:'
@@ -75,19 +83,19 @@ function delimiterRow(headerCells: any[], columns: number): string {
 }
 
 /** True when the table is a plain grid that pipe syntax can express as-is. */
-function isMarkdownSerializable(node: any): boolean {
+function isMarkdownSerializable(node: ProseMirrorNode): boolean {
     const [firstRow, ...bodyRows] = rowsOf(node);
     if (!firstRow) return false;
 
     // A pipe table is one line per row, so a cell has to be exactly one
     // paragraph — not two blocks, and not a list or a nested table, both of
     // which a cell accepts (`content: 'block+'`) and a pasted table can supply.
-    const fitsOnOneLine = (cell: any) =>
+    const fitsOnOneLine = (cell: ProseMirrorNode) =>
         cell.attrs.colspan <= 1
         && cell.attrs.rowspan <= 1
         && cell.childCount === 1
-        && cell.firstChild.isTextblock
-        && cell.firstChild.type.name !== 'codeBlock';
+        && cell.child(0).isTextblock
+        && cell.child(0).type.name !== 'codeBlock';
 
     // The first row is the header row — without one there is no delimiter
     // line to write.
@@ -98,7 +106,7 @@ function isMarkdownSerializable(node: any): boolean {
 }
 
 /** Cell text on a single line, safe to sit between two pipes. */
-function flatCellText(cell: any): string {
+function flatCellText(cell: ProseMirrorNode): string {
     // textBetween, not textContent: the latter concatenates a multi-block
     // cell's paragraphs with nothing between them, gluing the last word of
     // one to the first of the next.
@@ -113,15 +121,15 @@ function flatCellText(cell: any): string {
  * only. A merged cell writes its text once and pads the columns it spanned,
  * so the remaining cells stay under the right headers.
  */
-function writeFlattenedTable(state: any, node: any) {
+function writeFlattenedTable(state: MarkdownSerializerState, node: ProseMirrorNode) {
     const rows = rowsOf(node).map(cellsOf);
     const columns = Math.max(...rows.map(
-        (cells) => cells.reduce((total: number, cell: any) => total + (cell.attrs.colspan || 1), 0),
+        (cells) => cells.reduce((total: number, cell) => total + ((cell.attrs.colspan as number) || 1), 0),
     ));
 
     rows.forEach((cells, index) => {
         const texts: string[] = [];
-        cells.forEach((cell: any) => {
+        cells.forEach((cell) => {
             texts.push(flatCellText(cell));
             for (let i = 1; i < (cell.attrs.colspan || 1); i += 1) texts.push('');
         });
@@ -138,9 +146,9 @@ function writeFlattenedTable(state: any, node: any) {
 export const TableWithAlignment = Table.extend({
     addStorage() {
         return {
-            ...this.parent?.(),
+            ...(this.parent?.() as Record<string, unknown> | undefined),
             markdown: {
-                serialize(state: any, node: any) {
+                serialize(state: TableSerializerState, node: ProseMirrorNode) {
                     if (!isMarkdownSerializable(node)) {
                         writeFlattenedTable(state, node);
                         state.closeBlock(node);
@@ -163,8 +171,8 @@ export const TableWithAlignment = Table.extend({
                             // fromBlockStart=false: a cell is not the start of a
                             // line, so "- 3" or "# 2" needs no escape there —
                             // with it, every save turned "-1" into "\-1".
-                            if (cell.firstChild.textContent.trim()) {
-                                state.renderInline(cell.firstChild, false);
+                            if (cell.child(0).textContent.trim()) {
+                                state.renderInline(cell.child(0), false);
                             }
                         });
                         state.write(' |');

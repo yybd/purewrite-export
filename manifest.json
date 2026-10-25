@@ -1,7 +1,7 @@
 {
     "id": "purewrite-export",
     "name": "PureWrite Export",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "minAppVersion": "1.8.7",
     "description": "Export a note or a whole folder as a book-ready Word, PDF or EPUB file, with real footnotes, tables, images and chapter breaks, in Hebrew and English alike.",
     "author": "yybd",

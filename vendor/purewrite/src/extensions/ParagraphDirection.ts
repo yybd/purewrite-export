@@ -35,19 +35,24 @@ export function firstStrongDirection(text: string): 'rtl' | 'ltr' | null {
     return RTL_LETTER.test(match[0]) ? 'rtl' : 'ltr';
 }
 
-export const ParagraphDirection = Extension.create({
+interface ParagraphDirectionStorage {
+    autoDirection: boolean;
+    defaultDirection: 'rtl' | 'ltr';
+}
+
+export const ParagraphDirection = Extension.create<Record<string, never>, ParagraphDirectionStorage>({
     name: 'paragraphDirection',
 
     addStorage() {
         return {
             autoDirection: true,
-            defaultDirection: 'ltr' as 'rtl' | 'ltr',
+            defaultDirection: 'ltr',
         };
     },
 
     addCommands() {
         return {
-            setAutoDirection: (enabled: boolean) => ({ tr, dispatch }: { tr: any, dispatch: any }) => {
+            setAutoDirection: (enabled: boolean) => ({ tr, dispatch }) => {
                 this.storage.autoDirection = enabled;
                 if (dispatch) {
                     dispatch(tr.setMeta('autoDirectionUpdate', true));
@@ -56,7 +61,7 @@ export const ParagraphDirection = Extension.create({
             },
             // Direction for a block that has no previous block to inherit from
             // (i.e. the first block of the document).
-            setDefaultDirection: (direction: 'rtl' | 'ltr') => ({ tr, dispatch }: { tr: any, dispatch: any }) => {
+            setDefaultDirection: (direction: 'rtl' | 'ltr') => ({ tr, dispatch }) => {
                 this.storage.defaultDirection = direction;
                 if (dispatch) {
                     dispatch(tr.setMeta('autoDirectionUpdate', true));
@@ -67,14 +72,12 @@ export const ParagraphDirection = Extension.create({
     },
 
     addProseMirrorPlugins() {
-        const extension = this;
-
         return [
             new Plugin({
                 key: new PluginKey('paragraphDirection'),
                 props: {
-                    decorations(state) {
-                        if (!extension.storage.autoDirection) {
+                    decorations: (state) => {
+                        if (!this.storage.autoDirection) {
                             return DecorationSet.empty;
                         }
 
@@ -83,7 +86,7 @@ export const ParagraphDirection = Extension.create({
                         // Direction of the last block we resolved — what the
                         // next undetectable block inherits. Seeded with the UI
                         // language's direction for the top of the document.
-                        let inherited: 'rtl' | 'ltr' = extension.storage.defaultDirection === 'rtl' ? 'rtl' : 'ltr';
+                        let inherited: 'rtl' | 'ltr' = this.storage.defaultDirection === 'rtl' ? 'rtl' : 'ltr';
 
                         doc.descendants((node, pos, parent) => {
                             const name = node.type.name;

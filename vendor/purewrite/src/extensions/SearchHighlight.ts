@@ -40,7 +40,15 @@ declare module '@tiptap/core' {
     }
 }
 
-export const SearchHighlight = Extension.create({
+interface SearchHighlightOptions {
+    className: string;
+}
+
+interface SearchHighlightStorage {
+    searchQuery: string;
+}
+
+export const SearchHighlight = Extension.create<SearchHighlightOptions, SearchHighlightStorage>({
     name: 'searchHighlight',
 
     addOptions() {
@@ -93,15 +101,13 @@ export const SearchHighlight = Extension.create({
     },
 
     addProseMirrorPlugins() {
-        const extension = this;
-
         return [
             new Plugin({
                 key: new PluginKey('searchHighlight'),
                 props: {
-                    decorations(state) {
-                        const { searchQuery } = extension.storage;
-                        const { className } = extension.options;
+                    decorations: (state) => {
+                        const { searchQuery } = this.storage;
+                        const { className } = this.options;
                         const matches = findMatches(state.doc, searchQuery);
                         if (!matches.length) return DecorationSet.empty;
                         return DecorationSet.create(

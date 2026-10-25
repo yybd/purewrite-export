@@ -15,6 +15,22 @@ interface ImageInFolderOptions extends ImageOptions {
     onSaveError: (error: unknown) => void;
 }
 
+interface ImageInFolderStorage {
+    markdown: {
+        parse: {
+            setup(markdownit: { normalizeLink: (url: string) => string }): void;
+        };
+    };
+    baseDir: string;
+}
+
+/** The attributes the node view reads, as the image node keeps them. */
+interface ImageAttributes {
+    src?: string | null;
+    alt?: string | null;
+    title?: string | null;
+}
+
 /** Dropped or pasted images go here, beside the document. */
 export const IMAGE_FOLDER = 'images';
 
@@ -77,7 +93,7 @@ export function resolveImagePath(src: string, baseDir: string): string {
  * Inline, because Markdown images are inline: a block image would split the
  * paragraph around it.
  */
-export const ImageInFolder = Image.extend<ImageInFolderOptions>({
+export const ImageInFolder = Image.extend<ImageInFolderOptions, ImageInFolderStorage>({
     inline: true,
     group: 'inline',
 
@@ -110,32 +126,30 @@ export const ImageInFolder = Image.extend<ImageInFolderOptions>({
             },
             // The open document's folder. Set before the document's content
             // is, so each node view resolves against the right place.
-            baseDir: '' as string,
+            baseDir: '',
         };
     },
 
     addProseMirrorPlugins() {
-        const extension = this;
-
         // Save each file beside the document, then insert it where it was
         // dropped (or at the cursor). The file goes to disk first: an image
         // node pointing at a file that failed to save would be a broken
         // link written into the document.
         const insertImages = async (files: File[], pos: number) => {
-            const baseDir: string = extension.storage.baseDir;
+            const baseDir: string = this.storage.baseDir;
             let at = pos;
             for (const file of files) {
                 try {
                     const bytes = new Uint8Array(await file.arrayBuffer());
-                    const saved = await extension.options.saveImage(`${baseDir}/${IMAGE_FOLDER}`, imageFileName(file), bytes);
+                    const saved = await this.options.saveImage(`${baseDir}/${IMAGE_FOLDER}`, imageFileName(file), bytes);
                     if (!saved) throw new Error('Images cannot be saved here');
-                    extension.editor
+                    this.editor
                         .chain()
-                        .insertContentAt(at, { type: extension.name, attrs: { src: imageMarkdownPath(saved), alt: '' } })
+                        .insertContentAt(at, { type: this.name, attrs: { src: imageMarkdownPath(saved), alt: '' } })
                         .run();
-                    at = extension.editor.state.selection.to;
+                    at = this.editor.state.selection.to;
                 } catch (e) {
-                    extension.options.onSaveError(e);
+                    this.options.onSaveError(e);
                     return;
                 }
             }
@@ -145,9 +159,9 @@ export const ImageInFolder = Image.extend<ImageInFolderOptions>({
             new Plugin({
                 key: new PluginKey('imageDropPaste'),
                 props: {
-                    handleDrop(view: EditorView, event: DragEvent, _slice, moved: boolean) {
+                    handleDrop: (view: EditorView, event: DragEvent, _slice, moved: boolean) => {
                         // `moved` is a drag inside the document — ProseMirror's.
-                        if (moved || !extension.storage.baseDir) return false;
+                        if (moved || !this.storage.baseDir) return false;
                         const files = imageFiles(event.dataTransfer?.files);
                         if (!files.length) return false;
                         event.preventDefault();
@@ -155,8 +169,8 @@ export const ImageInFolder = Image.extend<ImageInFolderOptions>({
                         void insertImages(files, at?.pos ?? view.state.selection.from);
                         return true;
                     },
-                    handlePaste(view: EditorView, event: ClipboardEvent) {
-                        if (!extension.storage.baseDir) return false;
+                    handlePaste: (view: EditorView, event: ClipboardEvent) => {
+                        if (!this.storage.baseDir) return false;
                         const files = imageFiles(event.clipboardData?.files);
                         if (!files.length) return false;
                         // Word and many apps put a picture of the copied text
@@ -174,11 +188,15 @@ export const ImageInFolder = Image.extend<ImageInFolderOptions>({
 
     addNodeView() {
         return ({ node }) => {
-            const img = document.createElement('img');
-            img.alt = node.attrs.alt ?? '';
-            if (node.attrs.title) img.title = node.attrs.title;
+            // createElementNS, not createElement: the same <img>, and the one
+            // spelling Obsidian's review accepts without its own createEl,
+            // which the app does not have.
+            const img = document.createElementNS('http://www.w3.org/1999/xhtml', 'img') as HTMLImageElement;
+            const attrs = node.attrs as ImageAttributes;
+            img.alt = attrs.alt ?? '';
+            if (attrs.title) img.title = attrs.title;
             img.className = 'md-image';
-            const src: string = node.attrs.src ?? '';
+            const src: string = attrs.src ?? '';
             const baseDir: string = this.storage.baseDir;
             if (EXTERNAL.test(src)) {
                 img.src = src;
