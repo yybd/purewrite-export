@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
-import type { MarkdownSerializerState } from '@tiptap/pm/markdown';
+import type { MarkdownSerializerState } from 'prosemirror-markdown';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import type MarkdownIt from 'markdown-it';
 import type StateBlock from 'markdown-it/lib/rules_block/state_block.mjs';

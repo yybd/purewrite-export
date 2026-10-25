@@ -1,4 +1,4 @@
-import Image, { ImageOptions } from '@tiptap/extension-image';
+import { Image, type ImageOptions } from '@tiptap/extension-image';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import type { EditorView } from '@tiptap/pm/view';
 
@@ -102,10 +102,18 @@ export const ImageInFolder = Image.extend<ImageInFolderOptions, ImageInFolderSto
             inline: true,
             allowBase64: false,
             HTMLAttributes: {},
+            resize: false,
             loadImage: async () => null,
             saveImage: async () => null,
             onSaveError: () => {},
         };
+    },
+
+    // tiptap 3's image also keeps a width and a height, which Markdown has no
+    // way to write: a pasted <img width> would look sized and then lose its
+    // size at the next load. The node keeps what a Markdown image holds.
+    addAttributes() {
+        return { src: { default: null }, alt: { default: null }, title: { default: null } };
     },
 
     addStorage() {
@@ -212,3 +220,9 @@ export const ImageInFolder = Image.extend<ImageInFolderOptions, ImageInFolderSto
         };
     },
 });
+
+declare module '@tiptap/core' {
+    interface Storage {
+        image: { baseDir: string };
+    }
+}

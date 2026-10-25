@@ -1,7 +1,5 @@
-import Table from '@tiptap/extension-table';
-import TableHeader from '@tiptap/extension-table-header';
-import TableCell from '@tiptap/extension-table-cell';
-import type { MarkdownSerializerState } from '@tiptap/pm/markdown';
+import { Table, TableHeader, TableCell } from '@tiptap/extension-table';
+import type { MarkdownSerializerState } from 'prosemirror-markdown';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 
 /**
@@ -46,15 +44,23 @@ const ALIGNMENT_ATTRIBUTE = {
     },
 };
 
+// tiptap 3's cells read text-align into an `align` of their own. Two
+// attributes parsing the same style would both render it, and the export
+// reads `alignment`; the cell keeps the one it always had.
+function withAlignment(inherited: Record<string, unknown> | undefined) {
+    const { align: _align, ...rest } = inherited ?? {};
+    return { ...rest, ...ALIGNMENT_ATTRIBUTE };
+}
+
 export const TableHeaderWithAlignment = TableHeader.extend({
     addAttributes() {
-        return { ...this.parent?.(), ...ALIGNMENT_ATTRIBUTE };
+        return withAlignment(this.parent?.());
     },
 });
 
 export const TableCellWithAlignment = TableCell.extend({
     addAttributes() {
-        return { ...this.parent?.(), ...ALIGNMENT_ATTRIBUTE };
+        return withAlignment(this.parent?.());
     },
 });
 

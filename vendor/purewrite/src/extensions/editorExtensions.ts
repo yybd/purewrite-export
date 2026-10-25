@@ -1,12 +1,11 @@
 import StarterKit from '@tiptap/starter-kit';
-import { Markdown } from 'tiptap-markdown';
-import TextAlign from '@tiptap/extension-text-align';
-import Underline from '@tiptap/extension-underline';
-import Subscript from '@tiptap/extension-subscript';
-import Superscript from '@tiptap/extension-superscript';
-import TaskList from '@tiptap/extension-task-list';
-import TaskItem from '@tiptap/extension-task-item';
-import TableRow from '@tiptap/extension-table-row';
+import { Markdown, type MarkdownStorage } from 'tiptap-markdown';
+import { TextAlign } from '@tiptap/extension-text-align';
+import { Underline } from '@tiptap/extension-underline';
+import { Subscript } from '@tiptap/extension-subscript';
+import { Superscript } from '@tiptap/extension-superscript';
+import { TaskList, TaskItem } from '@tiptap/extension-list';
+import { TableRow } from '@tiptap/extension-table';
 import type { AnyExtension } from '@tiptap/core';
 import { ParagraphDirection } from './ParagraphDirection';
 import { TaskListMarkdown } from './TaskListMarkdown';
@@ -31,7 +30,13 @@ export interface ImageIO {
  */
 export function editorExtensions(images: ImageIO): AnyExtension[] {
     return [
-    StarterKit,
+    // tiptap 3's kit grew four extensions 2 did not have. Link and Underline
+    // are registered below, in the order they always were (the order of
+    // marks decides how overlapping ones are nested on save). TrailingNode
+    // would add an empty paragraph after a closing table or list, and
+    // ListKeymap changes what Backspace and Delete do at a list's edge —
+    // both new behaviour nobody asked for, so they stay off.
+    StarterKit.configure({ link: false, underline: false, trailingNode: false, listKeymap: false }),
     // html:false — don't parse raw HTML embedded in markdown files
     // (keeps saved markdown clean, and defense-in-depth for a webview
     // whose IPC can touch the filesystem).
@@ -71,7 +76,11 @@ export function editorExtensions(images: ImageIO): AnyExtension[] {
     // resizable stays off: a column width is a colwidth attribute with
     // no markdown representation, so dragging one would look like an
     // edit that then vanishes on the next load.
-    TableWithAlignment.configure({ resizable: false }),
+    //
+    // View: null keeps the bare <table> tiptap 2 drew. tiptap 3 otherwise
+    // wraps every table in a <div>, and the block direction (and the CSS
+    // that places a Hebrew table on the right) would land on the wrapper.
+    TableWithAlignment.configure({ resizable: false, View: null }),
     TableRow,
     TableHeaderWithAlignment,
     TableCellWithAlignment,
@@ -87,4 +96,12 @@ export function editorExtensions(images: ImageIO): AnyExtension[] {
     FocusMode,
     ParagraphDirection,
     ];
+}
+
+// tiptap 3 types `editor.storage` from what each extension declares here;
+// tiptap-markdown does not declare its own.
+declare module '@tiptap/core' {
+    interface Storage {
+        markdown: MarkdownStorage;
+    }
 }

@@ -1,4 +1,4 @@
-import Link from '@tiptap/extension-link';
+import { Link } from '@tiptap/extension-link';
 
 /**
  * The link mark, plus the one thing tiptap's own leaves behind: the title.
