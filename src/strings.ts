@@ -35,6 +35,8 @@ const en = {
     about: 'Exports are built by the export engine of PureWrite, a focused Markdown writer for Mac, iPhone and iPad. A folder exported here and in PureWrite is the same document, and the two share its settings (.purewrite-book.json in the folder).',
     aboutLink: 'About PureWrite',
     credit: 'Made with the export engine of {app}',
+    cardText: 'A focused writer for Mac, iPhone and iPad, in Hebrew and English. It opens this folder as it is, exports the same book, and keeps its settings.',
+    cardLink: 'Learn more',
 };
 
 const he: typeof en = {
@@ -66,6 +68,8 @@ const he: typeof en = {
     about: 'הייצוא נבנה במנוע הייצוא של PureWrite, עורך Markdown ממוקד ל־Mac, ל־iPhone ול־iPad. תיקייה שמיוצאת כאן וב־PureWrite היא אותו מסמך, ושניהם חולקים את ההגדרות שלה (‎.purewrite-book.json בתיקייה).',
     aboutLink: 'על PureWrite',
     credit: 'נוצר במנוע הייצוא של {app}',
+    cardText: 'עורך כתיבה ממוקד ל־Mac, ל־iPhone ול־iPad, בעברית ובאנגלית. הוא פותח את התיקייה הזו כמו שהיא, מייצא את אותו ספר ושומר את ההגדרות שלה.',
+    cardLink: 'לפרטים',
 };
 
 export type StringKey = keyof typeof en;

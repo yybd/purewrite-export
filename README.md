@@ -30,6 +30,11 @@ By hand: copy `main.js`, `manifest.json` and `styles.css` from the latest
 
 ## The engine, and PureWrite
 
+> **Disclosure:** after an export, the result screen shows a small card about
+> PureWrite, the author's own app, with a link to its page. It appears only
+> there, after an export you started — never as a pop-up or a notice — and
+> nothing is loaded from the internet to show it.
+
 The export is built by the export engine of [PureWrite](https://puretext.bdtech.app/purewrite),
 a focused Markdown writer for Mac, iPhone and iPad, sold separately on the App Store.
 This plugin is free and needs no PureWrite.

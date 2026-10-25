@@ -15,6 +15,7 @@ import { BOOK_FILE, orderByBook, parseBook, serializeBook, type BookSettings } f
 import { detectDirection, toCommonMark } from './obsidianMarkdown';
 import { pagedJs, pdfAvailable, renderPdf } from './pdf';
 import { isHebrew, t } from './strings';
+import purewriteIcon from '../assets/purewrite-icon.png';
 
 /**
  * PureWrite Export: a note, or a folder of chapters, as one Word, PDF or EPUB
@@ -396,7 +397,21 @@ class ExportModal extends Modal {
             });
         }
         footer.createEl('button', { cls: canOpen ? 'pwx-secondary' : 'pwx-primary', text: t('done') }).addEventListener('click', () => this.close());
-        this.credit(footer);
+        this.card(contentEl);
+    }
+
+    /**
+     * The one place the plugin speaks for the app: a small card on the
+     * result screen, which the user reached by exporting — never a pop-up
+     * or a notice (Obsidian's developer policies; disclosed in the README).
+     */
+    private card(parent: HTMLElement) {
+        const card = parent.createEl('a', { cls: 'pwx-card', href: PUREWRITE_URL });
+        card.createEl('img', { cls: 'pwx-card-icon', attr: { src: purewriteIcon, alt: '', width: '40', height: '40' } });
+        const text = card.createDiv({ cls: 'pwx-card-text' });
+        text.createDiv({ cls: 'pwx-card-title', text: 'PureWrite' });
+        text.createDiv({ cls: 'pwx-card-body', text: t('cardText') });
+        text.createDiv({ cls: 'pwx-card-link', text: `${t('cardLink')} ${isHebrew() ? '←' : '→'}` });
     }
 
     onClose() {

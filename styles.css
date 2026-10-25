@@ -229,3 +229,43 @@
 .pwx-credit a:hover {
     color: var(--text-muted);
 }
+.pwx-card {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    margin-top: 16px;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    color: inherit;
+    text-decoration: none;
+}
+.pwx-card:hover {
+    background: var(--background-modifier-hover);
+}
+.pwx-card-icon {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 9px;
+    /* The icon is drawn for a light ground; a dark theme keeps it so. */
+    background: #fff;
+    border: 1px solid var(--background-modifier-border);
+}
+.pwx-card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+.pwx-card-body {
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text-muted);
+}
+.pwx-card-link {
+    margin-top: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-normal);
+}

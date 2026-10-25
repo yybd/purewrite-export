@@ -34,6 +34,8 @@ const context = await esbuild.context({
     minify: production,
     outfile: 'main.js',
     plugins: [rawPagedJs],
+    // The app's icon for the card after an export (main.ts), inlined.
+    loader: { '.png': 'dataurl' },
 });
 
 if (production) {
