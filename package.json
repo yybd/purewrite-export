@@ -1,6 +1,6 @@
 {
   "name": "purewrite-export",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Book-ready Word and EPUB from a note or a folder, Hebrew and English alike — PureWrite's export engine in Obsidian.",
   "type": "module",

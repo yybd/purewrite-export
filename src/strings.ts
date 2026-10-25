@@ -76,7 +76,7 @@ export type StringKey = keyof typeof en;
 
 function language(): string {
     try {
-        return typeof getLanguage === 'function' ? getLanguage() : (window.localStorage.getItem('language') ?? 'en');
+        return getLanguage();
     } catch {
         return 'en';
     }
