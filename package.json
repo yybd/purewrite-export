@@ -2,7 +2,7 @@
     "name": "purewrite-export",
     "version": "0.3.0",
     "private": true,
-    "description": "Book-ready Word and EPUB from a note or a folder, Hebrew and English alike — PureWrite's export engine in Obsidian.",
+    "description": "Book-ready Word, PDF and EPUB from a note or a folder, with right-to-left (RTL) Hebrew and Arabic — no Pandoc needed.",
     "type": "module",
     "scripts": {
         "build": "node scripts/sync-engine.mjs --check && tsc --noEmit && eslint src && node esbuild.config.mjs production",

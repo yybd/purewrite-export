@@ -4,6 +4,16 @@ Book-ready Word, PDF and EPUB from a note or a whole folder — real footnotes, 
 lists, images and chapter breaks, with Hebrew and English set correctly side by side.
 Works on desktop and on phones and tablets (PDF on desktop). Free.
 
+**What sets it apart**
+
+- **No Pandoc, no LaTeX, nothing to install.** The Word (DOCX), PDF and EPUB writers are
+  inside the plugin, so it works offline and on mobile.
+- **Right-to-left (RTL) done properly.** Hebrew and Arabic paragraphs get their own
+  direction, page side and alignment, line by line, and English stays left-to-right beside
+  them, in Word, PDF and EPUB alike.
+- **A folder becomes a book.** Every note is a chapter, in your order, each one optionally
+  starting a new page, with real Word footnotes and a first-line indent, as in a book.
+
 ## Use
 
 - **A folder:** right-click it → *Export as a book (Word / PDF / EPUB)*, or run *Export the

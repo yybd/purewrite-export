@@ -3,7 +3,7 @@
     "name": "PureWrite Export",
     "version": "0.3.0",
     "minAppVersion": "1.8.7",
-    "description": "Export a note or a whole folder as a book-ready Word, PDF or EPUB file, with real footnotes, tables, images and chapter breaks, in Hebrew and English alike.",
+    "description": "Export a note or a whole folder as a book in Word (DOCX), PDF or EPUB, with no Pandoc to install. Right-to-left (RTL) Hebrew and Arabic are set correctly beside English. Real footnotes, tables, images and chapters. Offline, and on mobile too.",
     "author": "yybd",
     "isDesktopOnly": false,
     "authorUrl": "https://puretext.bdtech.app"
