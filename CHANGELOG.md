@@ -2,7 +2,7 @@
 
 The release notes of each version; the tag's message is the version's section.
 
-## Unreleased
+## 0.4.0
 
 - Formulas reach Word as real equations, editable in Word: fractions, roots, sub- and
   superscripts, sums and integrals with their limits, accents, and matrices and
