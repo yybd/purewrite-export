@@ -1,8 +1,8 @@
 {
     "name": "purewrite-export",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "private": true,
-    "description": "Book-ready Word, PDF and EPUB from a note or a folder, with right-to-left (RTL) Hebrew and Arabic — no Pandoc needed.",
+    "description": "Book-ready Word, PDF, EPUB and HTML from a note or a folder, with equations, diagrams and right-to-left (RTL) Hebrew and Arabic — no Pandoc needed.",
     "type": "module",
     "scripts": {
         "build": "node scripts/sync-engine.mjs --check && tsc --noEmit && eslint src && node esbuild.config.mjs production",

@@ -2,6 +2,11 @@
 
 The release notes of each version; the tag's message is the version's section.
 
+## 0.4.1
+
+- The description says what the plugin now does: HTML, math equations and Mermaid
+  diagrams, beside Word, PDF and EPUB.
+
 ## 0.4.0
 
 - Formulas reach Word as real equations, editable in Word: fractions, roots, sub- and
