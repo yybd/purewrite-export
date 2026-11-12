@@ -12,7 +12,9 @@ import {
     type ExportImage,
 } from '../vendor/purewrite/src/services/export/engine';
 import { BOOK_FILE, orderByBook, parseBook, serializeBook, type BookSettings } from '../vendor/purewrite/src/services/export/book';
-import { detectDirection, toCommonMark } from './obsidianMarkdown';
+import { diagramImage } from './diagrams';
+import { withFormulas } from './formulas';
+import { detectDirection, mermaidSources, toCommonMark, type Formula } from './obsidianMarkdown';
 import { pagedJs, pdfAvailable, renderPdf } from './pdf';
 import { isHebrew, t } from './strings';
 import purewriteIcon from '../assets/purewrite-icon.png';
@@ -35,8 +37,10 @@ import purewriteIcon from '../assets/purewrite-icon.png';
  * drawn by Chromium (pdf.ts), which a phone's Obsidian does not expose.
  */
 
-type Format = 'docx' | 'pdf' | 'epub';
-const FORMAT_LABELS: Record<Format, string> = { docx: 'Word', pdf: 'PDF', epub: 'EPUB' };
+type Format = 'docx' | 'pdf' | 'epub' | 'html';
+const FORMAT_LABELS: Record<Format, string> = { docx: 'Word', pdf: 'PDF', epub: 'EPUB', html: 'HTML' };
+/** Formats with no pages, where a chapter cannot start on a new one. */
+const PAGELESS: Format[] = ['epub', 'html'];
 const PUREWRITE_URL = 'https://puretext.bdtech.app/purewrite';
 /** The app's name, which is a name and keeps its capitals. */
 const APP_NAME = 'PureWrite';
@@ -162,15 +166,31 @@ export default class PureWriteExport extends Plugin {
         }
     }
 
-    /** One chapter, read, adapted and parsed, with its images. */
-    private async chapter(file: TFile, cache: Map<string, Promise<ExportImage | null>>): Promise<ExportChapter> {
+    /**
+     * One chapter, read, adapted and parsed, with its images. `seq` numbers
+     * the book's diagrams, so no two chapters give one the same `src`.
+     */
+    private async chapter(file: TFile, cache: Map<string, Promise<ExportImage | null>>, seq: { diagrams: number }): Promise<ExportChapter> {
         const resolver = {
             resolve: (target: string) => this.app.metadataCache.getFirstLinkpathDest(target, file.path)?.path ?? null,
         };
-        const doc = parseMarkdown(toCommonMark(await this.app.vault.cachedRead(file), resolver));
+        const text = await this.app.vault.cachedRead(file);
         const images = new Map<string, ExportImage>();
+        // Diagrams are drawn first: one mermaid cannot draw stays as its code.
+        const drawn = new Map<string, string>();
+        for (const source of mermaidSources(text)) {
+            if (drawn.has(source)) continue;
+            const image = await diagramImage(source);
+            if (!image) continue;
+            const src = `pwx-diagram:${++seq.diagrams}`;
+            drawn.set(source, src);
+            images.set(src, image);
+        }
+        const formulas: Formula[] = [];
+        const markdown = toCommonMark(text, resolver, { formulas, diagram: (source) => drawn.get(source) ?? null });
+        const doc = withFormulas(parseMarkdown(markdown), formulas);
         for (const src of imageSources(doc)) {
-            if (isRemoteImage(src)) continue; // no network
+            if (images.has(src) || isRemoteImage(src)) continue; // a diagram; or remote: no network
             let path = src;
             try {
                 path = decodeURI(src);
@@ -189,9 +209,10 @@ export default class PureWriteExport extends Plugin {
     async export(job: Job, format: Format, settings: Settings, onProgress: (p: Progress) => void): Promise<string> {
         const cache = new Map<string, Promise<ExportImage | null>>();
         const chapters: ExportChapter[] = [];
+        const seq = { diagrams: 0 };
         for (let i = 0; i < job.files.length; i++) {
             onProgress({ kind: 'reading', done: i + 1, total: job.files.length, file: job.files[i].basename });
-            chapters.push(await this.chapter(job.files[i], cache));
+            chapters.push(await this.chapter(job.files[i], cache, seq));
         }
         onProgress({ kind: 'writing' });
         const firstText = await this.app.vault.cachedRead(job.files[0]);
@@ -219,7 +240,7 @@ export default class PureWriteExport extends Plugin {
             const changes: BookSettings = {
                 title: settings.title,
                 firstLineIndent: settings.firstLineIndent,
-                chapterPageBreak: format === 'epub' ? undefined : settings.chapterPageBreak,
+                chapterPageBreak: PAGELESS.includes(format) ? undefined : settings.chapterPageBreak,
             };
             try {
                 await this.app.vault.adapter.write(job.bookPath, serializeBook(changes, await this.readText(job.bookPath)));
@@ -250,7 +271,7 @@ class ExportModal extends Modal {
         private job: Job,
     ) {
         super(app);
-        this.formats = pdfAvailable() ? ['docx', 'pdf', 'epub'] : ['docx', 'epub'];
+        this.formats = pdfAvailable() ? ['docx', 'pdf', 'epub', 'html'] : ['docx', 'epub', 'html'];
         this.settings = {
             title: job.book.title ?? (job.folder ? (job.folder.isRoot() ? app.vault.getName() : job.folder.name) : job.files[0].basename),
             chapterPageBreak: job.book.chapterPageBreak ?? true,
@@ -306,8 +327,8 @@ class ExportModal extends Modal {
             });
         }
 
-        // An EPUB has no pages to break: every chapter is a file of its own.
-        const breaks = Boolean(this.job.folder) && this.format !== 'epub';
+        // An EPUB or a web page has no pages to break.
+        const breaks = Boolean(this.job.folder) && !PAGELESS.includes(this.format);
         if (breaks) {
             this.checkbox(body, t('pageBreaks'), this.settings.chapterPageBreak, (v) => (this.settings.chapterPageBreak = v)).addClass('pwx-gap');
         }

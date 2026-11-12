@@ -1,7 +1,7 @@
 # PureWrite Export
 
-Book-ready Word, PDF and EPUB from a note or a whole folder — real footnotes, tables,
-lists, images and chapter breaks, with Hebrew and English set correctly side by side.
+Book-ready Word, PDF, EPUB and HTML from a note or a whole folder — real footnotes, tables,
+lists, images, formulas, diagrams and chapter breaks, with Hebrew and English set correctly side by side.
 Works on desktop and on phones and tablets (PDF on desktop). Free.
 
 **What sets it apart**
@@ -16,21 +16,27 @@ Works on desktop and on phones and tablets (PDF on desktop). Free.
 
 ## Use
 
-- **A folder:** right-click it → *Export as a book (Word / PDF / EPUB)*, or run *Export the
+- **A folder:** right-click it → *Export as a book (Word / PDF / EPUB / HTML)*, or run *Export the
   current note's folder as a book*. Every note in it and its subfolders becomes a
   chapter.
-- **A note:** right-click it → *Export as Word / PDF / EPUB*, or *Export the current note*.
+- **A note:** right-click it → *Export as Word / PDF / EPUB / HTML*, or *Export the current note*.
 
 The file is written into the vault, beside what it was made from, and the dialog
 offers to open it. Nothing leaves the device. A PDF is laid out with PureWrite's
 own print layout (paged.js) and printed by Obsidian's Chromium, so it is made on
-the desktop only; a phone offers Word and EPUB. The dialog speaks Hebrew when
+the desktop only; a phone offers Word, EPUB and HTML. The dialog speaks Hebrew when
 Obsidian does.
 
 **Chapter order** is by name (number your notes 01, 02, …), unless the folder holds an
 order saved by PureWrite (below). **Obsidian syntax** is read as Reading view shows
 it: image embeds become images, wikilinks their text, callouts quotes with a bold
-title; front matter, `%%comments%%` and block ids are left out.
+title; front matter, `%%comments%%` and block ids are left out. A `<details>` block
+is printed open under its summary in bold.
+
+**Formulas** (`$…$`, `$$…$$`) reach Word as real equations you can edit there, and
+EPUB, PDF and HTML as MathML; a formula KaTeX cannot read stays as its TeX. **Mermaid
+diagrams** are drawn by Obsidian's own mermaid and placed as pictures, in every
+format; one mermaid cannot draw stays as its code.
 
 ## Install
 
@@ -57,7 +63,8 @@ whichever app made it.
 
 ## Development
 
-`vendor/purewrite/` is PureWrite's engine, copied file for file — never edit it here.
+`vendor/purewrite/` is PureWrite's engine — the export files and everything they import,
+copied file for file. Never edit it here.
 
 ```bash
 pnpm install

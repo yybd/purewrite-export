@@ -15,6 +15,32 @@ export interface Resolver {
     resolve(target: string): string | null;
 }
 
+/** A formula as written: `$…$` inline, `$$…$$` on its own. */
+export interface Formula {
+    tex: string;
+    display: boolean;
+}
+
+/** What the engine's Markdown cannot carry, taken out before it parses. */
+export interface Extract {
+    /**
+     * Formulas, in the order found; each is left in the text as a
+     * placeholder (FORMULA_MARK) for the parsed document to swap back.
+     * Without this list, `$…$` stays as written.
+     */
+    formulas?: Formula[];
+    /** The image `src` that stands for a mermaid diagram; null keeps the code. */
+    diagram?: (source: string) => string | null;
+}
+
+/**
+ * Where formula `n` was: two private-use characters around its number,
+ * which no Markdown rule reads — so `_` and `*` in TeX are never taken for
+ * emphasis, and the number comes through the parser as plain text.
+ */
+export const formulaMark = (n: number) => `\uE000${n}\uE001`;
+export const FORMULA_MARK = /\uE000(\d+)\uE001/g;
+
 /** The pieces of a note that are code, which nothing below may touch. */
 function splitCode(text: string): { code: boolean; text: string }[] {
     const parts: { code: boolean; text: string }[] = [];
@@ -53,9 +79,40 @@ function displayName(target: string): string {
     return sub && !base ? sub.replace(/^\^/, '') : base || target;
 }
 
-function prose(text: string, resolver: Resolver): string {
+/** `$$…$$`, over lines, then `$…$` on one: Obsidian's rules (no space inside the `$`, no digit after). */
+const DISPLAY_MATH = /(?<!\\)\$\$([\s\S]+?)\$\$/g;
+const INLINE_MATH = /(?<![\\$])\$(?=[^\s$])([^$\n]*?[^\s\\$])\$(?!\d)/g;
+
+function formulas(text: string, found: Formula[] | undefined): string {
+    if (!found) return text;
+    const keep = (tex: string, display: boolean) => {
+        found.push({ tex, display });
+        return formulaMark(found.length - 1);
+    };
+    return text
+        .replace(DISPLAY_MATH, (whole, tex: string) =>
+            // Inside a quote or callout, each line of the TeX starts with `>`.
+            keep(tex.replace(/\n[ \t]*(?:>[ \t]?)+/g, '\n').trim(), true),
+        )
+        .replace(INLINE_MATH, (whole, tex: string) => keep(tex, false));
+}
+
+/**
+ * <details><summary>Title</summary> … </details> → the title in bold and
+ * the content open beneath it: a page has no button to open it with.
+ */
+function details(text: string): string {
+    return text
+        .replace(/<details\b[^>]*>\s*(?:<summary\b[^>]*>([\s\S]*?)<\/summary>\s*)?/gi, (whole, summary?: string) => {
+            const title = (summary ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+            return title ? `**${title}**\n\n` : '';
+        })
+        .replace(/[ \t]*<\/details>[ \t]*/gi, '');
+}
+
+function prose(text: string, resolver: Resolver, extract: Extract): string {
     return (
-        text
+        details(formulas(text, extract.formulas))
             // %% comments %% — Obsidian hides them in Reading view.
             .replace(/%%[\s\S]*?%%/g, '')
             // ![[image.png|alt]] and ![[image.png|300]] → a Markdown image.
@@ -96,10 +153,26 @@ function prose(text: string, resolver: Resolver): string {
     );
 }
 
+const MERMAID = /^(```|~~~)[ \t]*mermaid[ \t]*\n([\s\S]*?)\n?\1[^\n]*$/i;
+
+/** The source of every mermaid diagram in a note, in order. */
+export function mermaidSources(text: string): string[] {
+    return splitCode(stripFrontMatter(text)).flatMap((part) => {
+        const m = part.code ? MERMAID.exec(part.text) : null;
+        return m ? [m[2]] : [];
+    });
+}
+
+function code(text: string, extract: Extract): string {
+    const m = extract.diagram ? MERMAID.exec(text) : null;
+    const src = m && extract.diagram!(m[2]);
+    return src ? `![](${src})` : text;
+}
+
 /** A note's text as the engine should read it. */
-export function toCommonMark(text: string, resolver: Resolver): string {
+export function toCommonMark(text: string, resolver: Resolver, extract: Extract = {}): string {
     return splitCode(stripFrontMatter(text))
-        .map((part) => (part.code ? part.text : prose(part.text, resolver)))
+        .map((part) => (part.code ? code(part.text, extract) : prose(part.text, resolver, extract)))
         .join('');
 }
 
