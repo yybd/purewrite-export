@@ -1,5 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import { firstStrongDirection } from '../../extensions/ParagraphDirection';
+import { CITATION_MARK, LIST_END_MARK, LIST_START_MARK } from '../sources';
 import { DirectionTracker, plainText, splitByDirection } from './direction';
 import { DEFAULT_TEMPLATE, FIRST_LINE_INDENT, type ExportTemplate } from './templates';
 import { zip, type ZipEntry } from './zip';
@@ -53,6 +54,8 @@ export interface DocxInput {
     firstLineIndent?: boolean;
     /** For docProps/core.xml; fixed in tests. */
     date?: Date;
+    /** Live citations: Word's list of sources, and each citation's field code by how it was written. */
+    wordSources?: { xml: string; instruction: (raw: string) => string };
 }
 
 // ── XML helpers ─────────────────────────────────────────────────────────────
@@ -77,6 +80,8 @@ const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationship
 const NS_WP = 'http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing';
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const NS_PIC = 'http://schemas.openxmlformats.org/drawingml/2006/picture';
+// Office Math: a `formula` node's equation, as the caller wrote it in OMML.
+const NS_M = 'http://schemas.openxmlformats.org/officeDocument/2006/math';
 const XML_HEAD = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
 
 const EMU_PER_PX = 9525; // 914400 EMU per inch / 96 px per inch
@@ -148,6 +153,10 @@ function run(text: string, style: RunStyle, rtl: boolean, template: ExportTempla
     return `<w:r>${runProperties(style, rtl, template)}${textContent(text)}</w:r>`;
 }
 
+/** A field's opening: its code, up to where the text it shows begins. */
+const fieldOpen = (code: string) => `<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> ${xmlEscape(code)} </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r>`;
+const FIELD_CLOSE = '<w:r><w:fldChar w:fldCharType="end"/></w:r>';
+
 // ── The document ────────────────────────────────────────────────────────────
 
 interface ListContext {
@@ -192,6 +201,8 @@ class DocxWriter {
     private body: string[] = [];
     private footnotes: string[] = [];
     private nextFootnoteId = 1;
+    private nextSdtId = 1;
+    instruction: ((raw: string) => string) | null = null;
     private rels: Relationship[] = [];
     private media: ZipEntry[] = [];
     private mediaIds = new Map<ExportImage, string>();
@@ -277,6 +288,10 @@ class DocxWriter {
                 }
                 break;
             }
+            case 'rawMarkdown':
+                // As in the HTML export: definitions left out, the rest as source.
+                if (node.attrs?.kind !== 'definitions') this.codeBlock(node, ctx, out);
+                break;
             case 'codeBlock':
                 this.codeBlock(node, ctx, out);
                 break;
@@ -459,9 +474,17 @@ class DocxWriter {
             if (openLink) style.charStyle = 'Hyperlink';
 
             switch (node.type) {
-                case 'text':
+                case 'text': {
+                    const marks = node.marks ?? [];
+                    const cite = marks.find((m) => m.type === CITATION_MARK);
+                    const code = cite && this.instruction ? this.instruction(String(cite.attrs?.raw)) : '';
+                    if (marks.some((m) => m.type === LIST_START_MARK)) xml += fieldOpen('BIBLIOGRAPHY');
+                    if (code) xml += `<w:sdt><w:sdtPr><w:id w:val="${this.nextSdtId++}"/><w:citation/></w:sdtPr><w:sdtContent>${fieldOpen(code)}`;
                     for (const piece of directed[i]) xml += run(piece.text, style, piece.rtl, this.template);
+                    if (code) xml += `${FIELD_CLOSE}</w:sdtContent></w:sdt>`;
+                    if (marks.some((m) => m.type === LIST_END_MARK)) xml += FIELD_CLOSE;
                     break;
+                }
                 case 'hardBreak':
                     xml += '<w:r><w:br/></w:r>';
                     break;
@@ -471,6 +494,13 @@ class DocxWriter {
                 case 'image':
                     xml += this.image(node, rtlParagraph);
                     break;
+                case 'formula': {
+                    // A Word equation (<m:oMath>), which sits between runs; a
+                    // formula without one keeps its TeX, as written.
+                    const omml = node.attrs?.omml;
+                    xml += omml ? String(omml) : run(String(node.attrs?.tex ?? ''), { ...style, code: true }, false, this.template);
+                    break;
+                }
                 default:
                     if (node.text) xml += run(node.text, style, rtlParagraph, this.template);
             }
@@ -550,13 +580,16 @@ class DocxWriter {
         const sectPr = `<w:sectPr><w:footerReference w:type="default" r:id="rId5"/><w:pgSz w:w="${t.page.width}" w:h="${t.page.height}"/><w:pgMar w:top="${t.page.margin}" w:right="${t.page.margin}" w:bottom="${t.page.margin}" w:left="${t.page.margin}" w:header="708" w:footer="708" w:gutter="0"/>${documentRtl ? '<w:bidi/>' : ''}</w:sectPr>`;
         if (!this.body.length) this.body.push('<w:p/>');
 
-        const document = `${XML_HEAD}<w:document xmlns:w="${NS_W}" xmlns:r="${NS_R}" xmlns:wp="${NS_WP}" xmlns:a="${NS_A}" xmlns:pic="${NS_PIC}"><w:body>${this.body.join('')}${sectPr}</w:body></w:document>`;
+        const document = `${XML_HEAD}<w:document xmlns:w="${NS_W}" xmlns:r="${NS_R}" xmlns:wp="${NS_WP}" xmlns:a="${NS_A}" xmlns:pic="${NS_PIC}" xmlns:m="${NS_M}"><w:body>${this.body.join('')}${sectPr}</w:body></w:document>`;
 
-        const footnotes = `${XML_HEAD}<w:footnotes xmlns:w="${NS_W}" xmlns:r="${NS_R}" xmlns:wp="${NS_WP}" xmlns:a="${NS_A}" xmlns:pic="${NS_PIC}">`
+        const footnotes = `${XML_HEAD}<w:footnotes xmlns:w="${NS_W}" xmlns:r="${NS_R}" xmlns:wp="${NS_WP}" xmlns:a="${NS_A}" xmlns:pic="${NS_PIC}" xmlns:m="${NS_M}">`
             + '<w:footnote w:type="separator" w:id="-1"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:separator/></w:r></w:p></w:footnote>'
             + '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>'
             + this.footnotes.join('')
             + '</w:footnotes>';
+
+        const wordSources = input.wordSources;
+        if (wordSources) this.rels.push({ id: `rId${this.rels.length + 1}`, type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml', target: '../customXml/item1.xml' });
 
         const rels = `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${this.rels
             .map((r) => `<Relationship Id="${r.id}" Type="${r.type}" Target="${xmlEscape(r.target)}"${r.external ? ' TargetMode="External"' : ''}/>`)
@@ -579,6 +612,7 @@ class DocxWriter {
             + '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>'
             + '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>'
             + '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>'
+            + (wordSources ? '<Override PartName="/customXml/itemProps1.xml" ContentType="application/vnd.openxmlformats-officedocument.customXmlProperties+xml"/>' : '')
             + '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
             + '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
             + '</Types>';
@@ -602,6 +636,11 @@ class DocxWriter {
             { name: 'word/footer1.xml', data: footer },
             { name: 'word/_rels/document.xml.rels', data: rels },
             ...this.media,
+            ...(wordSources ? [
+                { name: 'customXml/item1.xml', data: wordSources.xml },
+                { name: 'customXml/itemProps1.xml', data: `${XML_HEAD}<ds:datastoreItem ds:itemID="{7B1F0A52-3C4E-4D6A-9E21-5A8C6F1D2B30}" xmlns:ds="http://schemas.openxmlformats.org/officeDocument/2006/customXml"><ds:schemaRefs><ds:schemaRef ds:uri="http://schemas.openxmlformats.org/officeDocument/2006/bibliography"/></ds:schemaRefs></ds:datastoreItem>` },
+                { name: 'customXml/_rels/item1.xml.rels', data: `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXmlProps" Target="itemProps1.xml"/></Relationships>` },
+            ] : []),
         ]);
     }
 }
@@ -706,6 +745,7 @@ function numberingXml(nums: { numId: number; ordered: boolean; start: number; le
 
 export function buildDocx(input: DocxInput): Uint8Array {
     const writer = new DocxWriter(input.template ?? DEFAULT_TEMPLATE, input.defaultDirection, input.firstLineIndent === true);
+    writer.instruction = input.wordSources?.instruction ?? null;
     input.chapters.forEach((chapter, i) => writer.addChapter(chapter, i > 0 && input.chapterPageBreak !== false));
     return writer.finish(input);
 }

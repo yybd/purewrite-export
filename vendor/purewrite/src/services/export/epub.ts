@@ -140,7 +140,7 @@ export function buildEpub(input: EpubInput): Uint8Array {
 <manifest>
 <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
 <item id="css" href="style.css" media-type="text/css"/>
-${bodies.map((c, i) => `<item id="c${i + 1}" href="${c.file}" media-type="application/xhtml+xml"/>`).join('\n')}
+${bodies.map((c, i) => `<item id="c${i + 1}" href="${c.file}" media-type="application/xhtml+xml"${/<math[\s>]/.test(c.body) ? ' properties="mathml"' : ''}/>`).join('\n')}
 ${writer.media.map((m, i) => `<item id="img${i + 1}" href="${m.path}" media-type="${mediaType(m.path)}"/>`).join('\n')}
 </manifest>
 <spine page-progression-direction="${dir}">

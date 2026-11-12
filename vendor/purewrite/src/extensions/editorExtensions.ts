@@ -16,6 +16,11 @@ import { ImageInFolder, ImageLoader, ImageSaver } from './ImageInFolder';
 import { SearchHighlight } from './SearchHighlight';
 import { FocusMode } from './FocusMode';
 import { TextWithCitations } from './TextWithCitations';
+import { HtmlComment } from './HtmlComment';
+import { MarkdownFidelity, RawHtml, RawMarkdown } from './MarkdownFidelity';
+import { TemplateGuide } from './TemplateGuide';
+import { CitationView } from './CitationView';
+import { CitationComplete } from './CitationComplete';
 
 export interface ImageIO {
     loadImage: ImageLoader;
@@ -92,6 +97,17 @@ export function editorExtensions(images: ImageIO): AnyExtension[] {
     // footnote to `\[^1\]` (see Footnotes.ts).
     FootnoteReference,
     FootnoteDefinition,
+    // `<!-- a note -->` on lines of its own, kept as written and left out of
+    // the export. Without it the save escaped it to a visible
+    // `&lt;!-- … --&gt;` (see HtmlComment.ts).
+    HtmlComment,
+    // Raw HTML, link definitions and display math, kept as written and shown
+    // as their source; reference links, wikilinks, math and the writer's own
+    // markers (`*` bullets, `_em_`, setext headings…) kept as written too.
+    // Without them the first keystroke rewrote all of it (see MarkdownFidelity.ts).
+    RawMarkdown,
+    RawHtml,
+    MarkdownFidelity,
     // `![alt](path)`. Without it every image was deleted from the file
     // on the next save (see ImageInFolder.ts).
     // Dropped or pasted images are saved to images/ beside the file.
@@ -99,6 +115,12 @@ export function editorExtensions(images: ImageIO): AnyExtension[] {
     SearchHighlight,
     FocusMode,
     ParagraphDirection,
+    // A writing template's guidance under its headings — drawn, never saved
+    // (see TemplateGuide.ts).
+    TemplateGuide,
+    // A citation as it reads, over its [@key] (see CitationView.ts).
+    CitationView,
+    CitationComplete,
     ];
 }
 

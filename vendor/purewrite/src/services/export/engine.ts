@@ -3,7 +3,7 @@ import { editorExtensions } from '../../extensions/editorExtensions';
 import { splitFrontMatter } from '../../extensions/frontMatter';
 import { buildDocx, type ExportChapter, type ExportImage } from './docx';
 import { buildEpub } from './epub';
-import { buildPrintDocument, printPage } from './html';
+import { buildPrintDocument, buildWebPage, printPage } from './html';
 import { DEFAULT_TEMPLATE } from './templates';
 
 /**
@@ -18,7 +18,7 @@ import { DEFAULT_TEMPLATE } from './templates';
  * WebKit (pdf.ts), Obsidian's Chromium on the desktop.
  */
 
-export type EngineFormat = 'docx' | 'epub';
+export type EngineFormat = 'docx' | 'epub' | 'html';
 
 export interface EngineInput {
     title: string;
@@ -26,6 +26,8 @@ export interface EngineInput {
     defaultDirection: 'rtl' | 'ltr';
     chapterPageBreak?: boolean;
     firstLineIndent?: boolean;
+    /** Word alone: its list of sources, and each citation's field code. */
+    wordSources?: { xml: string; instruction: (raw: string) => string };
 }
 
 /** Markdown through the editor's whole schema — what the editor would show. */
@@ -124,6 +126,7 @@ export function buildPrintPage(input: EngineInput, pagedJs: string): PrintPage {
 }
 
 export function buildBook(format: EngineFormat, input: EngineInput): Uint8Array {
+    if (format === 'html') return new TextEncoder().encode(buildWebPage(input));
     return format === 'epub' ? buildEpub(input) : buildDocx(input);
 }
 

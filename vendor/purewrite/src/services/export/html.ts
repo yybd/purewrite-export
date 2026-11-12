@@ -71,13 +71,16 @@ const MARK_TAGS: Record<string, string> = {
 };
 
 /**
- * How the writer differs between the two books it makes. Print (the PDF):
+ * How the writer differs between the documents it makes. Print (the PDF):
  * footnotes float to the bottom of their page, images inline as data URLs.
  * EPUB: footnotes are EPUB 3 notes (a `noteref` link and an `aside` at the
  * end of the chapter, which Apple Books and others show as a popup), images
  * are files of their own, and headings carry ids for the table of contents.
+ * Web (the HTML export): one file to open in any browser — notes at the end
+ * of the chapter as in the EPUB, linked both ways, and images inline as data
+ * URLs as in print, so the file needs nothing beside it.
  */
-export type HtmlMode = 'print' | 'epub';
+export type HtmlMode = 'print' | 'epub' | 'web';
 
 export interface TocEntry {
     level: number;
@@ -117,7 +120,8 @@ export class HtmlWriter {
             .filter((n) => n.type !== 'footnoteDefinition')
             .map((n) => this.block(n))
             .join('');
-        const notes = this.notes.length ? `<section class="footnotes" epub:type="footnotes">${this.notes.join('')}</section>` : '';
+        const role = this.mode === 'epub' ? 'epub:type="footnotes"' : 'role="doc-endnotes"';
+        const notes = this.notes.length ? `<section class="footnotes" ${role}>${this.notes.join('')}</section>` : '';
         return `<section class="chapter">${body}${notes}</section>`;
     }
 
@@ -138,7 +142,7 @@ export class HtmlWriter {
                 const imageOnly = (node.content ?? []).length > 0 && (node.content ?? []).every((c) => c.type === 'image');
                 const cls = imageOnly ? ' class="figure"' : '';
                 let id = '';
-                if (node.type === 'heading' && this.mode === 'epub' && !this.inFootnote) {
+                if (node.type === 'heading' && this.mode !== 'print' && !this.inFootnote) {
                     const anchor = `h${++this.headingNumber}`;
                     id = ` id="${anchor}"`;
                     this.headings.push({ level: Number(node.attrs?.level) || 1, id: anchor, text: plainText(node) });
@@ -169,6 +173,11 @@ export class HtmlWriter {
                     .join('');
                 return `<ul class="tasks" dir="${dir}">${items}</ul>`;
             }
+            case 'rawMarkdown':
+                // Link definitions are not text of the document; a block of
+                // HTML or display math is shown as its source, as in the editor.
+                if (node.attrs?.kind === 'definitions') return '';
+                return this.block({ ...node, type: 'codeBlock' }, forced);
             case 'codeBlock': {
                 const text = (node.content ?? []).map((c) => c.text ?? '').join('');
                 return `<pre dir="ltr"><code>${escapeHtml(text)}</code></pre>`;
@@ -219,6 +228,9 @@ export class HtmlWriter {
                         return this.footnote(String(node.attrs?.label), dir);
                     case 'image':
                         return this.image(node);
+                    case 'formula':
+                        // MathML, as the caller rendered it; otherwise the TeX.
+                        return node.attrs?.mathml ? String(node.attrs.mathml) : `<code>${escapeHtml(String(node.attrs?.tex ?? ''))}</code>`;
                     default:
                         return node.text ? escapeHtml(node.text) : '';
                 }
@@ -244,7 +256,7 @@ export class HtmlWriter {
         const definition = this.definitions.get(label);
         if (!definition || this.inFootnote) return escapeHtml(`[^${label}]`);
         const noteDir = firstStrongDirection(plainText(definition)) ?? dir;
-        if (this.mode === 'epub') return this.epubNote(definition, noteDir);
+        if (this.mode !== 'print') return this.epubNote(definition, noteDir);
         this.inFootnote = true;
         // Paragraphs of a note as spans: the note itself must stay an inline element for paged.js.
         const body = this.directions.aside(() =>
@@ -275,8 +287,9 @@ export class HtmlWriter {
         this.inFootnote = false;
         const back = `<a class="fn-back" href="#fnref${n}">${n}.</a> `;
         const numbered = body.startsWith('<p ') ? body.replace(/^(<p [^>]*>)/, `$1${back}`) : back + body;
-        this.notes.push(`<aside epub:type="footnote" id="fn${n}" dir="${noteDir}">${numbered}</aside>`);
-        return `<sup class="fn-call"><a epub:type="noteref" id="fnref${n}" href="#fn${n}">${n}</a></sup>`;
+        const [note, ref] = this.mode === 'epub' ? ['epub:type="footnote"', 'epub:type="noteref"'] : ['role="doc-footnote"', 'role="doc-noteref"'];
+        this.notes.push(`<aside ${note} id="fn${n}" dir="${noteDir}">${numbered}</aside>`);
+        return `<sup class="fn-call"><a ${ref} id="fnref${n}" href="#fn${n}">${n}</a></sup>`;
     }
 
     private image(node: JSONContent): string {
@@ -417,9 +430,80 @@ export function printPage(doc: PrintDocument, pagedJs: string): string {
     // push the pages sideways out of the drawn rect.
     var content = document.getElementById('pw-content').content;
     new PagedModule.Previewer().preview(content, [{ 'book.css': css }], document.body)
-        .then(function (flow) { window.__pwPageCount = flow.total; })
+        .then(function (flow) {
+            // What belongs to a whole page rather than to the text on it: its tint,
+            // and marks placed by the page's own corners (a script's revision).
+            document.querySelectorAll('[data-page-tint]').forEach(function (el) {
+                var page = el.closest('.pagedjs_page');
+                if (page) page.style.background = el.getAttribute('data-page-tint');
+                el.remove();
+            });
+            document.querySelectorAll('[data-page-mark]').forEach(function (el) {
+                var page = el.closest('.pagedjs_page');
+                if (page) { page.style.position = 'relative'; page.appendChild(el); }
+            });
+            window.__pwPageCount = flow.total;
+        })
         .catch(function (e) { window.__pwError = String(e && e.stack || e); });
 })();
 </script>
 </body></html>`;
+}
+
+/** The HTML export's stylesheet: a column for reading on any screen, light or dark. */
+const WEB_CSS = `
+:root { color-scheme: light dark; --text: #1a1a1a; --muted: #555; --rule: #ccc; --code: #f2f2f2; --link: #0563c1; }
+@media (prefers-color-scheme: dark) { :root { --text: #e6e6e6; --muted: #aaa; --rule: #444; --code: #262626; --link: #6ea8fe; } }
+html { font-family: Georgia, "Times New Roman", serif; font-size: 18px; line-height: 1.6; color: var(--text); background: Canvas; }
+body { margin: 0 auto; max-width: 42em; padding: 2em 1.25em 4em; }
+p { margin: 0 0 0.8em; text-align: start; }
+p.figure { text-align: center; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.4em 0 0.5em; text-align: start; }
+.chapter > h1:first-child { margin-top: 0; }
+.chapter + .chapter { margin-top: 3em; padding-top: 2em; border-top: 1px solid var(--rule); }
+blockquote { margin: 0 0 1em; padding-inline-start: 0.9em; border-inline-start: 0.2em solid var(--rule); color: var(--muted); }
+ul, ol { margin: 0 0 1em; padding-inline-start: 1.8em; }
+li p { margin: 0 0 0.2em; }
+ul.tasks { list-style: none; padding-inline-start: 0.3em; }
+ul.tasks .box { margin-inline-end: 0.3em; }
+ul.tasks li p { display: inline; }
+pre { white-space: pre-wrap; background: var(--code); padding: 0.6em 0.8em; border-radius: 4px; text-align: left; font-size: 0.85em; line-height: 1.4; overflow-x: auto; }
+code { font-family: Menlo, Consolas, monospace; }
+table { border-collapse: collapse; margin: 0 0 1em; }
+th, td { border: 1px solid var(--rule); padding: 0.25em 0.5em; vertical-align: top; text-align: start; }
+th p, td p { margin: 0; text-align: inherit; }
+img { max-width: 100%; height: auto; }
+hr { border: 0; border-top: 1px solid var(--rule); margin: 1.5em 0; }
+a { color: var(--link); }
+.fn-call { font-size: 0.7em; line-height: 0; }
+.fn-call a, .fn-back { text-decoration: none; }
+section.footnotes { margin-top: 2em; border-top: 1px solid var(--rule); padding-top: 0.5em; font-size: 0.85em; }
+section.footnotes aside p { margin: 0 0 0.3em; }
+`;
+
+/**
+ * The folder as one HTML file: every chapter in order, the same blocks and
+ * direction per block as the PDF and the EPUB, images inside the file, and
+ * nothing it loads from anywhere — it opens the same offline and online.
+ */
+export function buildWebPage(input: HtmlInput): string {
+    const writer = new HtmlWriter(input.defaultDirection, 'web');
+    const content = input.chapters.map((c) => writer.chapter(c)).join('\n');
+    // A tie goes to the direction the app would give a new document.
+    const rtl = writer.rtlBlocks > writer.ltrBlocks || (writer.rtlBlocks === writer.ltrBlocks && input.defaultDirection === 'rtl');
+    const css = input.firstLineIndent ? `${WEB_CSS}${firstLineIndentCss('1.5em', '0.8em')}\n` : WEB_CSS;
+    return `<!doctype html>
+<html lang="${rtl ? 'he' : 'en'}" dir="${rtl ? 'rtl' : 'ltr'}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="PureWrite">
+<title>${escapeHtml(input.title)}</title>
+<style>${css}</style>
+</head>
+<body>
+${content}
+</body>
+</html>
+`;
 }

@@ -7,7 +7,7 @@
 //
 // Never edit vendor/ by hand: a fix belongs in PureWrite, then a sync.
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 const source = process.env.PUREWRITE;
@@ -24,13 +24,27 @@ if (!source || !existsSync(join(source, 'src/services/export/engine.ts'))) {
 }
 const target = 'vendor/purewrite';
 
-const EXPORT = ['engine', 'book', 'docx', 'epub', 'html', 'direction', 'templates', 'zip'];
-const files = [
-    ...EXPORT.map((n) => `src/services/export/${n}.ts`),
-    ...readdirSync(join(source, 'src/extensions'))
-        .filter((n) => n.endsWith('.ts') && !n.endsWith('.test.ts'))
-        .map((n) => `src/extensions/${n}`),
-];
+// The engine's entry points, and every PureWrite file they import, followed
+// import by import — a fixed list fell behind the app whenever the engine
+// began to import a new file.
+const ENTRIES = ['src/services/export/engine.ts', 'src/services/export/book.ts'];
+const IMPORT = /(?:import|export)\s[^;]*?from\s+['"](\.[^'"]+)['"]/g;
+const files = [];
+const queue = [...ENTRIES];
+while (queue.length) {
+    const file = queue.shift();
+    if (files.includes(file)) continue;
+    files.push(file);
+    for (const m of readFileSync(join(source, file), 'utf8').matchAll(IMPORT)) {
+        const base = join(dirname(file), m[1]);
+        const found = [`${base}.ts`, `${base}.tsx`, `${base}/index.ts`, base].find(
+            (c) => existsSync(join(source, c)) && statSync(join(source, c)).isFile(),
+        );
+        if (!found) throw new Error(`${file}: cannot find ${m[1]}`);
+        queue.push(found);
+    }
+}
+files.sort();
 
 const commit = execFileSync('git', ['-C', source, 'rev-parse', '--short', 'HEAD']).toString().trim();
 const stamp = `PureWrite ${commit}\n${files.join('\n')}\n`;
