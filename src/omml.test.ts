@@ -23,6 +23,13 @@ describe('formulas as Word equations', () => {
         expect(xml).not.toContain('\\sin');
     });
 
+    it('puts a matrix and \\left…\\right in brackets that grow with them', () => {
+        const xml = texToOmml('\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}', false)!;
+        expect(xml).toMatch(/^<m:oMath><m:d><m:dPr><m:begChr m:val="\("\/><m:endChr m:val="\)"\/><\/m:dPr><m:e><m:m>/);
+        // An empty side (\right.) is an empty delimiter, not a stray dot.
+        expect(texToOmml('\\left\\{ x \\right.', false)).toContain('<m:begChr m:val="{"/><m:endChr m:val=""/>');
+    });
+
     it('returns null for TeX KaTeX cannot read', () => {
         expect(texToOmml('\\frac{', false)).toBeNull();
     });

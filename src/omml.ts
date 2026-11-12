@@ -47,11 +47,29 @@ function nary(chr: string, sub: Element | undefined, sup: Element | undefined, r
     return `<m:nary>${pr}<m:sub>${sub ? convert(sub) : ''}</m:sub><m:sup>${sup ? convert(sup) : ''}</m:sup><m:e>${rest}</m:e></m:nary>`;
 }
 
+const isFence = (el: Element | undefined): el is Element => el?.localName === 'mo' && el.getAttribute('fence') === 'true';
+
 function convert(el: Element): string {
     const c = kids(el);
     switch (el.localName) {
+        case 'mrow': {
+            // \left( … \right) and a matrix's brackets: a Word delimiter,
+            // which grows with what it holds (a plain ( stays one line high).
+            const first = c[0];
+            const last = c[c.length - 1];
+            // KaTeX leaves out an empty side (\right.), so one fence is enough:
+            // each \left…\right has a row of its own.
+            const open = isFence(first);
+            const close = c.length > 1 && isFence(last);
+            if (open || close) {
+                const beg = open ? (first.textContent ?? '').trim() : '';
+                const end = close ? (last.textContent ?? '').trim() : '';
+                const inner = c.slice(open ? 1 : 0, close ? -1 : undefined);
+                return `<m:d><m:dPr><m:begChr m:val="${esc(beg)}"/><m:endChr m:val="${esc(end)}"/></m:dPr><m:e>${seq(inner)}</m:e></m:d>`;
+            }
+            return seq(c);
+        }
         case 'math':
-        case 'mrow':
         case 'mstyle':
         case 'mpadded':
         case 'mphantom':
