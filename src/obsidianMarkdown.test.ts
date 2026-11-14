@@ -62,6 +62,12 @@ describe('formulas, details and diagrams', () => {
         expect(toCommonMark('$x$', resolver)).toBe('$x$');
     });
 
+    it('finds a formula at the very start, and two side by side', () => {
+        const formulas: Formula[] = [];
+        expect(toCommonMark('$a$ $b$,$c$\n$$d$$', resolver, { formulas })).toBe(`${formulaMark(1)} ${formulaMark(2)},${formulaMark(3)}\n${formulaMark(0)}`);
+        expect(formulas.map((f) => f.tex)).toEqual(['d', 'a', 'b', 'c']);
+    });
+
     it('reads a formula inside a callout without its quote marks', () => {
         const formulas: Formula[] = [];
         toCommonMark('> [!info] Law\n> $$\n> E = mc^2\n> $$', resolver, { formulas });

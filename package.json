@@ -5,7 +5,7 @@
     "description": "Book-ready Word, PDF, EPUB and HTML from a note or a folder, with equations, diagrams and right-to-left (RTL) Hebrew and Arabic — no Pandoc needed.",
     "type": "module",
     "scripts": {
-        "build": "node scripts/sync-engine.mjs --check && tsc --noEmit && eslint src && node esbuild.config.mjs production",
+        "build": "node scripts/sync-engine.mjs --check && tsc --noEmit && eslint src && node esbuild.config.mjs production && node scripts/check-bundle.mjs",
         "dev": "node esbuild.config.mjs",
         "sync-engine": "node scripts/sync-engine.mjs",
         "test": "vitest run",

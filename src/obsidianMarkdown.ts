@@ -79,9 +79,15 @@ function displayName(target: string): string {
     return sub && !base ? sub.replace(/^\^/, '') : base || target;
 }
 
-/** `$$…$$`, over lines, then `$…$` on one: Obsidian's rules (no space inside the `$`, no digit after). */
-const DISPLAY_MATH = /(?<!\\)\$\$([\s\S]+?)\$\$/g;
-const INLINE_MATH = /(?<![\\$])\$(?=[^\s$])([^$\n]*?[^\s\\$])\$(?!\d)/g;
+/**
+ * `$$…$$`, over lines, then `$…$` on one: Obsidian's rules (no space inside
+ * the `$`, no digit after). What comes before the opening `$` (not `\`, and
+ * for `$…$` not another `$`) is matched and put back rather than looked
+ * behind for: iOS before 16.4 cannot parse a lookbehind, and one in the
+ * bundle stops the whole plugin from loading there.
+ */
+const DISPLAY_MATH = /(^|[^\\])\$\$([\s\S]+?)\$\$/g;
+const INLINE_MATH = /(^|[^\\$])\$(?=[^\s$])([^$\n]*?[^\s\\$])\$(?!\d)/g;
 
 function formulas(text: string, found: Formula[] | undefined): string {
     if (!found) return text;
@@ -90,11 +96,11 @@ function formulas(text: string, found: Formula[] | undefined): string {
         return formulaMark(found.length - 1);
     };
     return text
-        .replace(DISPLAY_MATH, (whole, tex: string) =>
+        .replace(DISPLAY_MATH, (whole, before: string, tex: string) =>
             // Inside a quote or callout, each line of the TeX starts with `>`.
-            keep(tex.replace(/\n[ \t]*(?:>[ \t]?)+/g, '\n').trim(), true),
+            before + keep(tex.replace(/\n[ \t]*(?:>[ \t]?)+/g, '\n').trim(), true),
         )
-        .replace(INLINE_MATH, (whole, tex: string) => keep(tex, false));
+        .replace(INLINE_MATH, (whole, before: string, tex: string) => before + keep(tex, false));
 }
 
 /**

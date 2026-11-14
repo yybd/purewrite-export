@@ -39,7 +39,10 @@ export const WIKILINK = /!?\[\[[^[\]\n]+\]\]/gu;
  * `$x$` and `$$x$$` inside a line, Pandoc's way: no space inside the dollars,
  * and no digit right after the closing one — `$5 and $6` is two prices.
  */
-export const INLINE_MATH = /\$\$(?:[^$\n]|\$(?!\$))+?\$\$|\$(?=[^\s$])(?:[^$\n\\]|\\[^\n])*?(?<=[^\s\\])\$(?!\d)/gu;
+// The last thing before the closing `$` is a letter that is neither a space
+// nor a backslash, or an escape: written as its own piece rather than as a
+// lookbehind, which iOS before 16.4 cannot read (the Obsidian plugin runs this).
+export const INLINE_MATH = /\$\$(?:[^$\n]|\$(?!\$))+?\$\$|\$(?=[^\s$])(?:[^$\n\\]|\\[^\n])*?(?:[^\s$\\]|\\[^\s\\])\$(?!\d)/gu;
 
 /** What is written as typed: comments, wikilinks and math. */
 const KEPT = new RegExp(`${HTML_COMMENT.source}|${WIKILINK.source}|${INLINE_MATH.source}`, 'gu');

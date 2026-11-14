@@ -2,6 +2,12 @@
 
 The release notes of each version; the tag's message is the version's section.
 
+## 0.4.2
+
+- Loads again on iPhone and iPad with iOS before 16.4: no regular expression in the
+  plugin uses a lookbehind, which those versions cannot read. The build now fails if
+  one appears. This is what failed the directory review of 0.4.1.
+
 ## 0.4.1
 
 - The description says what the plugin now does: HTML, math equations and Mermaid
