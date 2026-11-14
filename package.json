@@ -1,6 +1,6 @@
 {
     "name": "purewrite-export",
-    "version": "0.4.1",
+    "version": "0.4.2",
     "private": true,
     "description": "Book-ready Word, PDF, EPUB and HTML from a note or a folder, with equations, diagrams and right-to-left (RTL) Hebrew and Arabic — no Pandoc needed.",
     "type": "module",
