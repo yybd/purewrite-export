@@ -78,8 +78,9 @@ export const CitationComplete = Extension.create({
             const below = floor - at.bottom - 4;
             const above = at.top - 4 - roof;
             // Measured at its full height first: no CSS caps .cite-menu, so
-            // clearing the inline cap leaves it uncapped.
-            menu.style.maxHeight = '';
+            // without the inline cap it is uncapped. Removed, not assigned:
+            // Obsidian's directory review fails any fixed style value, '' too.
+            menu.style.removeProperty('max-height');
             const wanted = menu.offsetHeight;
             const goBelow = below >= wanted || below >= above;
             const room = Math.max(80, goBelow ? below : above);

@@ -5,7 +5,7 @@ The release notes of each version; the tag's message is the version's section.
 ## 0.4.3
 
 - Passes the directory review again: the last inline style the review flagged in
-  PureWrite's engine is gone (PureWrite 13b19fa). The build now lints the engine with
+  PureWrite's engine is gone (PureWrite 8dd74af). The build now lints the engine with
   the review's own rules (eslint-plugin-obsidianmd 0.5.1), so this fails before a
   release rather than after.
 
