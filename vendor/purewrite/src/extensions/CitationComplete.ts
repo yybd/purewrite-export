@@ -77,8 +77,9 @@ export const CitationComplete = Extension.create({
             const floor = Math.min(window.visualViewport?.height ?? window.innerHeight, toolbar && toolbar > at.bottom ? toolbar : Infinity) - 8;
             const below = floor - at.bottom - 4;
             const above = at.top - 4 - roof;
-            // Measured at its full height first.
-            menu.style.setProperty('max-height', 'none');
+            // Measured at its full height first: no CSS caps .cite-menu, so
+            // clearing the inline cap leaves it uncapped.
+            menu.style.maxHeight = '';
             const wanted = menu.offsetHeight;
             const goBelow = below >= wanted || below >= above;
             const room = Math.max(80, goBelow ? below : above);
